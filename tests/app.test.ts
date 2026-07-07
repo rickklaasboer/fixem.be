@@ -277,3 +277,30 @@ test("proxy-required video drops to link when PROXY_SECRET unset", async () => {
   expect(html).not.toContain("og:video");
   expect(html).not.toContain("tiktokcdn");
 });
+
+test("proxy-required video on a non-allowlisted host drops to link (not a 403 player)", async () => {
+  const config = loadConfig({ PROXY_SECRET: "s", PUBLIC_BASE_URL: "https://fixem.be" });
+  const logger = createLogger({ write: () => {} });
+  const cache = new MemoryCache();
+  const proxAdapter = {
+    name: "prox",
+    match: (u: URL) => u.hostname === "prox.test",
+    canonicalize: (u: URL) => `https://prox.test${u.pathname}`,
+    resolve: async () => ({
+      kind: "video" as const,
+      title: "vid",
+      siteName: "Prox",
+      originalUrl: "https://prox.test/1",
+      // host NOT on the proxy allowlist — a minted token would 403 at /v/
+      video: { url: "https://sketchy-cdn.example/a.mp4", mimeType: "video/mp4", proxyHeaders: { Referer: "x" } },
+    }),
+  };
+  const resolver = new Resolver({
+    registry: new AdapterRegistry([proxAdapter]),
+    cache, logger, ttlSeconds: 60, timeoutMs: 1000,
+  });
+  const res = await get(makeApp({ config, resolver }), "/https://prox.test/1", DISCORD_UA);
+  const html = await res.text();
+  expect(html).not.toContain("og:video");
+  expect(html).not.toContain("sketchy-cdn.example");
+});

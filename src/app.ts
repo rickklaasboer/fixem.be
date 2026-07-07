@@ -9,7 +9,7 @@ import { parseTargetUrl } from "./url";
 import type { Resolver } from "./resolver";
 import { minimalMeta, renderMetaHtml } from "./render/meta-html";
 import { renderOembed } from "./render/oembed";
-import { mountProxy } from "./proxy";
+import { mountProxy, isHostAllowed } from "./proxy";
 import { signProxyToken } from "./lib/proxy-sign";
 import type { EmbedMetadata } from "./adapters/types";
 
@@ -35,15 +35,27 @@ export function buildApp(deps: AppDeps): Hono {
     `${config.publicBaseUrl}/oembed?url=${encodeURIComponent(canonicalUrl)}`;
 
   const PROXY_TOKEN_TTL_MS = 3_600_000;
+  function dropVideo(meta: EmbedMetadata): EmbedMetadata {
+    const { video, ...rest } = meta;
+    return { ...rest, kind: meta.kind === "video" ? "link" : meta.kind };
+  }
   async function withProxiedVideo(meta: EmbedMetadata): Promise<EmbedMetadata> {
-    if (!meta.video?.proxyHeaders || !config.proxySecret) {
-      // No proxy configured/needed → strip the hint; if proxy is required but
-      // disabled, drop the video rather than emit an unplayable CDN URL.
-      if (meta.video?.proxyHeaders && !config.proxySecret) {
-        const { video, ...rest } = meta;
-        return { ...rest, kind: meta.kind === "video" ? "link" : meta.kind };
-      }
-      return meta;
+    if (!meta.video?.proxyHeaders) return meta;
+    // Proxy required but disabled → drop rather than emit an unplayable CDN URL.
+    if (!config.proxySecret) return dropVideo(meta);
+    // The /v/ route only fetches https allowlisted hosts, so a video whose host
+    // isn't allowlisted would mint a token that always 403s — a player that
+    // fails to load is worse than an honest thumbnail/link. Degrade + warn so
+    // allowlist drift is visible instead of silently broken in Discord.
+    let u: URL;
+    try {
+      u = new URL(meta.video.url);
+    } catch {
+      return dropVideo(meta);
+    }
+    if (u.protocol !== "https:" || !isHostAllowed(u.hostname, config.proxyHostAllowlist)) {
+      logger.warn({ host: u.hostname }, "video host not proxyable (not https/allowlisted) — degrading to link");
+      return dropVideo(meta);
     }
     const token = await signProxyToken(config.proxySecret, {
       url: meta.video.url,
@@ -76,7 +88,7 @@ export function buildApp(deps: AppDeps): Hono {
     return c.json(renderOembed(outcome.meta, config.publicBaseUrl));
   });
 
-  mountProxy(app, { config, logger });
+  mountProxy(app, { config, logger, rateLimitStore, now });
 
   app.get("*", async (c) => {
     const parsed = parseTargetUrl(c.req.path, new URL(c.req.url).search.slice(1));

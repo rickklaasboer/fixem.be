@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { Hono } from "hono";
-import { mountProxy } from "../src/proxy";
+import { mountProxy, isHostAllowed } from "../src/proxy";
 import { loadConfig } from "../src/lib/config";
 import { createLogger } from "../src/lib/logger";
+import { MemoryRateLimitStore } from "../src/lib/rate-limit";
 import { signProxyToken } from "../src/lib/proxy-sign";
 import type { FetchFn } from "../src/adapters/types";
 
@@ -125,5 +126,90 @@ describe("/v/ proxy", () => {
     const app = await appWith(fetchFn);
     const tok = await tokenFor("https://v16.tiktokcdn.com/a.mp4");
     expect((await app.request(`/v/${tok}`)).status).toBe(403);
+  });
+
+  test("403 on non-https target scheme, even on an allowlisted host", async () => {
+    const app = await appWith((async () => new Response("x")) as unknown as FetchFn);
+    // hostname is allowlisted but scheme is http / file — must be rejected
+    expect((await app.request(`/v/${await tokenFor("http://v16.tiktokcdn.com/a.mp4")}`)).status).toBe(403);
+    expect((await app.request(`/v/${await tokenFor("file://cdninstagram.com/etc/passwd")}`)).status).toBe(403);
+  });
+
+  test("403 on redirect scheme downgrade to http", async () => {
+    const fetchFn = (async (input: unknown) => {
+      if (new URL(String(input)).hostname === "v16.tiktokcdn.com") {
+        return new Response(null, { status: 302, headers: { location: "http://cdn.muscdn.com/x.mp4" } });
+      }
+      return new Response("x", { status: 200 });
+    }) as unknown as FetchFn;
+    const app = await appWith(fetchFn);
+    expect((await app.request(`/v/${await tokenFor("https://v16.tiktokcdn.com/a.mp4")}`)).status).toBe(403);
+  });
+
+  test("502 after too many redirect hops", async () => {
+    // always redirect to another allowlisted host → exceeds MAX_REDIRECTS
+    const fetchFn = (async () =>
+      new Response(null, {
+        status: 302,
+        headers: { location: "https://v16.tiktokcdn.com/next.mp4" },
+      })) as unknown as FetchFn;
+    const app = await appWith(fetchFn);
+    expect((await app.request(`/v/${await tokenFor("https://v16.tiktokcdn.com/a.mp4")}`)).status).toBe(502);
+  });
+
+  test("502 when a 206 body's content-range total exceeds the ceiling", async () => {
+    const fetchFn = (async () =>
+      new Response("PART", {
+        status: 206,
+        headers: { "content-range": "bytes 0-3/999999999", "content-length": "4" },
+      })) as unknown as FetchFn;
+    const app = await appWith(fetchFn, { PROXY_MAX_BYTES: "1000" });
+    expect((await app.request(`/v/${await tokenFor("https://v16.tiktokcdn.com/a.mp4")}`, { headers: { Range: "bytes=0-3" } })).status).toBe(502);
+  });
+
+  test("streaming byteCeiling errors the body when an undeclared response overflows", async () => {
+    // No content-length/content-range → declared check can't catch it; the
+    // streaming counter must. Two 600-byte chunks vs a 1000-byte ceiling.
+    const big = "a".repeat(600);
+    const fetchFn = (async () => {
+      const stream = new ReadableStream<Uint8Array>({
+        start(ctrl) {
+          const enc = new TextEncoder();
+          ctrl.enqueue(enc.encode(big));
+          ctrl.enqueue(enc.encode(big));
+          ctrl.close();
+        },
+      });
+      return new Response(stream, { status: 200, headers: { "content-type": "video/mp4" } });
+    }) as unknown as FetchFn;
+    const app = await appWith(fetchFn, { PROXY_MAX_BYTES: "1000" });
+    const res = await app.request(`/v/${await tokenFor("https://v16.tiktokcdn.com/a.mp4")}`);
+    expect(res.status).toBe(200); // headers already sent before the overflow
+    await expect(res.text()).rejects.toThrow(); // body stream errors past the ceiling
+  });
+
+  test("429 when the client IP exceeds the rate limit", async () => {
+    const config = loadConfig({ PROXY_SECRET: SECRET, RATE_LIMIT_PER_MIN: "1" });
+    const app = new Hono();
+    mountProxy(app, {
+      config,
+      logger: silent,
+      rateLimitStore: new MemoryRateLimitStore(),
+      fetchFn: (async () => new Response("x", { status: 200 })) as unknown as FetchFn,
+      now: () => 1000,
+    });
+    const tok = await tokenFor("https://v16.tiktokcdn.com/a.mp4");
+    expect((await app.request(`/v/${tok}`)).status).toBe(200);
+    expect((await app.request(`/v/${tok}`)).status).toBe(429);
+  });
+
+  test("isHostAllowed resists suffix-bypass shapes", () => {
+    const list = ["tiktokcdn.com", "cdninstagram.com"];
+    expect(isHostAllowed("v16.tiktokcdn.com", list)).toBe(true);
+    expect(isHostAllowed("tiktokcdn.com", list)).toBe(true);
+    expect(isHostAllowed("evil-tiktokcdn.com", list)).toBe(false);
+    expect(isHostAllowed("tiktokcdn.com.evil.com", list)).toBe(false);
+    expect(isHostAllowed("cdninstagram.com.attacker.net", list)).toBe(false);
+    expect(isHostAllowed("notcdninstagram.com", list)).toBe(false);
   });
 });

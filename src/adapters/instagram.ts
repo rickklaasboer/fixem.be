@@ -61,10 +61,17 @@ function codeOf(url: URL): string | null {
 
 // Map a single media node (the post itself or a sidecar child) to its kind and
 // image/video fields. Shared so sidecar children also pick up video proxying.
+// The modern `xdt_shortcode_media` node returns XDT-prefixed typenames
+// (XDTGraphVideo/XDTGraphImage/XDTGraphSidecar); the legacy `shortcode_media`
+// alias uses the bare names. Normalize so both resolve identically.
+function baseTypename(t: string | undefined): string {
+  return (t ?? "").replace(/^XDT/, "");
+}
+
 function pickMedia(node: MediaNode): Pick<EmbedMetadata, "kind" | "image" | "video"> {
   const width = node.dimensions?.width;
   const height = node.dimensions?.height;
-  if (node.__typename === "GraphVideo" && node.video_url) {
+  if (baseTypename(node.__typename) === "GraphVideo" && node.video_url) {
     return {
       kind: "video",
       video: {
@@ -176,7 +183,7 @@ export function createInstagramAdapter(
       // "N items" hint isn't lost.
       let node: MediaNode = media;
       const children = media.edge_sidecar_to_children?.edges;
-      if (media.__typename === "GraphSidecar" && children && children.length > 0) {
+      if (baseTypename(media.__typename) === "GraphSidecar" && children && children.length > 0) {
         node = children[0]!.node ?? media;
         if (children.length > 1) descParts.push(`📷 ${children.length}`);
       }

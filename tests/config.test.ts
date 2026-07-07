@@ -85,6 +85,18 @@ describe("loadConfig", () => {
     expect(c.instagram.proxyUrl).toBe("https://proxy.test/?u=");
   });
 
+  test("TIKTOK_REHYDRATION_SCRIPT_ID is overridable, blank falls back", () => {
+    expect(loadConfig({ TIKTOK_REHYDRATION_SCRIPT_ID: "__CUSTOM__" }).tiktok.rehydrationScriptId).toBe("__CUSTOM__");
+    expect(loadConfig({ TIKTOK_REHYDRATION_SCRIPT_ID: "" }).tiktok.rehydrationScriptId).toBe(
+      TIKTOK_DEFAULTS.rehydrationScriptId,
+    );
+  });
+
+  test("default proxy allowlist covers the EU TikTok CDN family", () => {
+    const c = loadConfig({});
+    expect(c.proxyHostAllowlist).toContain("tiktokcdn-eu.com");
+  });
+
   test("falls back to default on non-numeric value", () => {
     expect(loadConfig({ PORT: "banana" }).port).toBe(3000);
   });

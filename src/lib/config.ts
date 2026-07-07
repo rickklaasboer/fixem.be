@@ -31,7 +31,8 @@ export interface Config {
 
 export const DEFAULT_PROXY_ALLOWLIST = [
   "cdninstagram.com", "fbcdn.net", "tiktokcdn.com", "tiktokcdn-us.com",
-  "tiktokv.com", "tiktok.com", "muscdn.com", "byteoversea.com", "video.twimg.com",
+  "tiktokcdn-eu.com", "tiktokv.com", "tiktokv.eu", "tiktok.com", "muscdn.com",
+  "byteoversea.com", "video.twimg.com",
 ];
 
 function int(value: string | undefined, fallback: number): number {
@@ -89,7 +90,7 @@ export function loadConfig(
       friendlyName: env.THREADS_FRIENDLY_NAME || THREADS_DEFAULTS.friendlyName,
     },
     tiktok: {
-      rehydrationScriptId: TIKTOK_DEFAULTS.rehydrationScriptId,
+      rehydrationScriptId: env.TIKTOK_REHYDRATION_SCRIPT_ID || TIKTOK_DEFAULTS.rehydrationScriptId,
       mobileApiHost: env.TIKTOK_MOBILE_API_HOST || TIKTOK_DEFAULTS.mobileApiHost,
       iid: env.TIKTOK_IID || TIKTOK_DEFAULTS.iid,
       deviceId: env.TIKTOK_DEVICE_ID || TIKTOK_DEFAULTS.deviceId,

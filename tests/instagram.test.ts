@@ -118,6 +118,41 @@ describe("instagram adapter", () => {
     expect(m.originalUrl).toBe("https://www.instagram.com/p/CabcDEF456");
   });
 
+  test("modern XDT-prefixed typenames resolve like the legacy names", async () => {
+    // The preferred xdt_shortcode_media node returns XDTGraphVideo/XDTGraphSidecar
+    // in the wild; without prefix-normalization video would silently degrade to image.
+    const xdtVideo = structuredClone(videoFixture) as {
+      data: { xdt_shortcode_media: { __typename: string } };
+    };
+    xdtVideo.data.xdt_shortcode_media.__typename = "XDTGraphVideo";
+    const ad = createInstagramAdapter(fakeFetch({ body: xdtVideo }));
+    const m = await ad.resolve(new URL("https://www.instagram.com/reel/CabcDEF456"));
+    expect(m.kind).toBe("video");
+    expect(m.video?.url).toBe("https://scontent.cdninstagram.com/ig_video_720.mp4?efg=sig&_nc_ht=x");
+
+    const xdtSidecar = {
+      data: {
+        xdt_shortcode_media: {
+          __typename: "XDTGraphSidecar",
+          shortcode: "CabcDEF456",
+          owner: { username: "johndoe" },
+          edge_media_to_caption: { edges: [{ node: { text: "gallery" } }] },
+          edge_sidecar_to_children: {
+            edges: [
+              { node: { __typename: "XDTGraphImage", display_url: "https://scontent.cdninstagram.com/s1.jpg" } },
+              { node: { __typename: "XDTGraphImage", display_url: "https://scontent.cdninstagram.com/s2.jpg" } },
+            ],
+          },
+        },
+      },
+    };
+    const ad2 = createInstagramAdapter(fakeFetch({ body: xdtSidecar }));
+    const m2 = await ad2.resolve(new URL("https://www.instagram.com/p/CabcDEF456"));
+    expect(m2.kind).toBe("image");
+    expect(m2.image?.url).toBe("https://scontent.cdninstagram.com/s1.jpg");
+    expect(m2.description).toContain("📷 2");
+  });
+
   test("login wall (status: fail) -> informative link embed, does NOT throw", async () => {
     const ad = createInstagramAdapter(fakeFetch({ body: { status: "fail" } }));
     const m = await ad.resolve(P_URL);

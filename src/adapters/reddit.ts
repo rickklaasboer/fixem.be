@@ -114,9 +114,14 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch, creds?: RedditCred
       let canonical = this.canonicalize(url);
       if (SHARE_RE.test(url.pathname)) {
         // The .json endpoint 307s share links to a non-JSON target, so follow
-        // the redirect manually and resolve the real permalink instead.
+        // the redirect manually and resolve the real permalink instead. Send
+        // the bearer when configured — the anonymous probe is IP-blocked on the
+        // same networks OAuth exists for, so share links would otherwise never
+        // resolve with credentials set.
+        const shareHeaders: Record<string, string> = { "User-Agent": PLATFORM_UA };
+        if (getToken) shareHeaders.Authorization = `bearer ${await getToken()}`;
         const redirect = await fetchFn(canonical, {
-          headers: { "User-Agent": PLATFORM_UA },
+          headers: shareHeaders,
           redirect: "manual",
         });
         let target: URL;

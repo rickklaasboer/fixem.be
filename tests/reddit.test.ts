@@ -119,6 +119,28 @@ describe("reddit adapter", () => {
     expect(m.originalUrl).toBe("https://www.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea");
   });
 
+  test("share link redirect probe carries bearer when credentials are set", async () => {
+    const probeHeaders: (string | null)[] = [];
+    const fetchFn = (async (input: Parameters<FetchFn>[0], init?: RequestInit) => {
+      const url = String(input);
+      const auth = new Headers(init?.headers).get("Authorization");
+      if (url.includes("access_token")) {
+        return new Response(JSON.stringify({ access_token: "tok", expires_in: 3600 }));
+      }
+      if (url.endsWith("/r/pics/s/AbCdEf123")) {
+        probeHeaders.push(auth);
+        return new Response(null, {
+          status: 307,
+          headers: { Location: "https://www.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea/" },
+        });
+      }
+      return new Response(JSON.stringify(imagePost));
+    }) as unknown as FetchFn;
+    const ad = createRedditAdapter(fetchFn, { clientId: "id", clientSecret: "secret" });
+    await ad.resolve(new URL("https://www.reddit.com/r/pics/s/AbCdEf123"));
+    expect(probeHeaders).toEqual(["bearer tok"]);
+  });
+
   test("share link without redirect throws", async () => {
     const ad = createRedditAdapter(fetchReturning({}, 200));
     expect(ad.resolve(new URL("https://www.reddit.com/r/pics/s/AbCdEf123"))).rejects.toThrow(

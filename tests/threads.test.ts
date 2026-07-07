@@ -66,7 +66,9 @@ describe("threads adapter", () => {
     await ad.resolve(POST_URL);
     expect(recorded).toHaveLength(2);
     expect(recorded[0]!.url).toContain("bulk-route-definitions");
-    expect(recorded[0]!.body).toContain("route_urls");
+    // Raw wire format: the route_urls[0] key must NOT be percent-encoded.
+    expect(recorded[0]!.body).toContain("route_urls[0]=");
+    expect(recorded[0]!.body).not.toContain("route_urls%5B0%5D");
     expect(recorded[0]!.body).toContain(`lsd=${THREADS_DEFAULTS.lsd}`);
     expect(recorded[0]!.headers.get("X-FB-LSD")).toBe(THREADS_DEFAULTS.lsd);
     expect(recorded[0]!.headers.get("User-Agent")).toBe(FIREFOX_UA);
@@ -144,6 +146,34 @@ describe("threads adapter", () => {
     expect(m.kind).toBe("image");
     expect(m.image?.url).toBe("https://scontent.cdninstagram.com/c1.jpg");
     expect(m.description).toBe("Trip dump 📷 3");
+  });
+
+  test("carousel count marker still appears when the post has a top-level cover", async () => {
+    const withCover = {
+      data: {
+        data: {
+          containing_thread: {
+            thread_items: [
+              {
+                post: {
+                  user: { username: "carol" },
+                  caption: { text: "Trip dump" },
+                  // top-level cover present — must not suppress the carousel count
+                  image_versions2: { candidates: [{ url: "https://scontent.cdninstagram.com/cover.jpg", width: 800, height: 800 }] },
+                  carousel_media: [
+                    { image_versions2: { candidates: [{ url: "https://scontent.cdninstagram.com/c1.jpg" }] } },
+                    { image_versions2: { candidates: [{ url: "https://scontent.cdninstagram.com/c2.jpg" }] } },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      },
+    };
+    const ad = createThreadsAdapter(fakeFetch({ post: withCover }));
+    const m = await ad.resolve(POST_URL);
+    expect(m.description).toBe("Trip dump 📷 2");
   });
 
   test("thread with a text-only last item picks the last item that has .post", async () => {

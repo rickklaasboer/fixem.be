@@ -124,12 +124,11 @@ export function createThreadsAdapter(
         "X-ASBD-ID": ASBD_ID,
         "Sec-Fetch-Site": "same-origin",
       },
-      body: new URLSearchParams({
-        "route_urls[0]": pathname,
-        __a: "1",
-        __comet_req: "29",
-        lsd: cfg.lsd,
-      }).toString(),
+      // Built as a raw string to match Meta's documented wire format byte-for-
+      // byte: URLSearchParams would percent-encode the `route_urls[0]` key.
+      body:
+        `route_urls[0]=${encodeURIComponent(pathname)}` +
+        `&__a=1&__comet_req=29&lsd=${encodeURIComponent(cfg.lsd)}`,
     });
     if (!res.ok) throw new Error(`threads route ${res.status}`);
     const text = await res.text();
@@ -213,8 +212,11 @@ export function createThreadsAdapter(
 
       let media = pickMedia(post);
       const carousel = post.carousel_media;
-      if (media.kind === "link" && carousel && carousel.length > 0) {
-        media = pickMedia(carousel[0]!);
+      // A carousel is the gallery signal regardless of any top-level cover: use
+      // the first child for media when the post itself exposes none, and always
+      // mark the count so the "N images" hint isn't dropped when a cover exists.
+      if (carousel && carousel.length > 0) {
+        if (media.kind === "link") media = pickMedia(carousel[0]!);
         if (carousel.length > 1) descParts.push(`📷 ${carousel.length}`);
       }
 

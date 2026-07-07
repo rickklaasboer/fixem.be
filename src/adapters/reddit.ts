@@ -16,6 +16,38 @@ const SHARE_RE = /^\/r\/[^/]+\/s\/[^/]+\/?$/;
 
 const USER_AGENT = "fixem.be/1.0 (embed fixer; +https://fixem.be)";
 
+const TOKEN_URL = "https://www.reddit.com/api/v1/access_token";
+// Refresh when the cached token is within this margin of expiry.
+const TOKEN_REFRESH_MARGIN_MS = 60_000;
+
+interface RedditCreds {
+  clientId: string;
+  clientSecret: string;
+}
+
+// App-only (client_credentials) token manager. State lives in the closure, so
+// each adapter instance caches its own token.
+function createTokenManager(fetchFn: FetchFn, creds: RedditCreds): () => Promise<string> {
+  let cached: { token: string; expiresAt: number } | undefined;
+  return async () => {
+    if (cached && Date.now() < cached.expiresAt - TOKEN_REFRESH_MARGIN_MS) return cached.token;
+    const res = await fetchFn(TOKEN_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${btoa(`${creds.clientId}:${creds.clientSecret}`)}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": USER_AGENT,
+      },
+      body: "grant_type=client_credentials",
+    });
+    if (!res.ok) throw new Error(`reddit: token request failed (${res.status})`);
+    const json = (await res.json()) as { access_token?: string; expires_in?: number };
+    if (!json.access_token) throw new Error("reddit: token response missing access_token");
+    cached = { token: json.access_token, expiresAt: Date.now() + (json.expires_in ?? 0) * 1000 };
+    return cached.token;
+  };
+}
+
 interface RedditPost {
   title: string;
   author: string;
@@ -65,7 +97,8 @@ function pickMedia(post: RedditPost): Pick<EmbedMetadata, "kind" | "image" | "vi
   return { kind: "link", image: previewImage(post) };
 }
 
-export function createRedditAdapter(fetchFn: FetchFn = fetch): PlatformAdapter {
+export function createRedditAdapter(fetchFn: FetchFn = fetch, creds?: RedditCreds): PlatformAdapter {
+  const getToken = creds ? createTokenManager(fetchFn, creds) : undefined;
   return {
     name: "reddit",
     match(url) {
@@ -95,9 +128,15 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch): PlatformAdapter {
         }
         canonical = `https://www.reddit.com${target.pathname.replace(/\/$/, "")}`;
       }
-      const res = await fetchFn(`${canonical}.json?raw_json=1`, {
-        headers: { "User-Agent": USER_AGENT },
-      });
+      // With credentials, hit oauth.reddit.com — anonymous www.reddit.com JSON
+      // is IP-blocked on many networks. Canonical URLs stay www.reddit.com.
+      const res = getToken
+        ? await fetchFn(`https://oauth.reddit.com${new URL(canonical).pathname}.json?raw_json=1`, {
+            headers: { Authorization: `bearer ${await getToken()}`, "User-Agent": USER_AGENT },
+          })
+        : await fetchFn(`${canonical}.json?raw_json=1`, {
+            headers: { "User-Agent": USER_AGENT },
+          });
       if (!res.ok) throw new Error(`reddit ${res.status}`);
       const json = (await res.json()) as [{ data: { children: { data: RedditPost }[] } }, unknown];
       const post = json[0]?.data?.children?.[0]?.data;

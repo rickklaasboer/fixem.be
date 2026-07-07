@@ -13,7 +13,12 @@ const config = loadConfig();
 const logger = createLogger();
 const cache = createRedisCache(config.redisUrl);
 const registry = new AdapterRegistry([
-  createRedditAdapter(),
+  createRedditAdapter(
+    fetch,
+    config.redditClientId && config.redditClientSecret
+      ? { clientId: config.redditClientId, clientSecret: config.redditClientSecret }
+      : undefined,
+  ),
   createBlueskyAdapter(),
   createDummyAdapter(),
 ]);

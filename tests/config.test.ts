@@ -19,11 +19,15 @@ describe("loadConfig", () => {
       CACHE_TTL_SECONDS: "60",
       EXTRA_CRAWLER_UAS: "MyBot, OtherBot",
       TWITCH_CLIENT_ID: "abc",
+      REDDIT_CLIENT_ID: "rid",
+      REDDIT_CLIENT_SECRET: "rsecret",
     });
     expect(c.port).toBe(8080);
     expect(c.cacheTtlSeconds).toBe(60);
     expect(c.extraCrawlerUas).toEqual(["mybot", "otherbot"]);
     expect(c.twitchClientId).toBe("abc");
+    expect(c.redditClientId).toBe("rid");
+    expect(c.redditClientSecret).toBe("rsecret");
   });
 
   test("falls back to default on non-numeric value", () => {

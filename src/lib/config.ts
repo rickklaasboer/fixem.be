@@ -8,6 +8,8 @@ export interface Config {
   extraCrawlerUas: string[];
   twitchClientId?: string;
   twitchClientSecret?: string;
+  redditClientId?: string;
+  redditClientSecret?: string;
 }
 
 function int(value: string | undefined, fallback: number): number {
@@ -39,5 +41,7 @@ export function loadConfig(
       .filter(Boolean),
     twitchClientId: env.TWITCH_CLIENT_ID,
     twitchClientSecret: env.TWITCH_CLIENT_SECRET,
+    redditClientId: env.REDDIT_CLIENT_ID,
+    redditClientSecret: env.REDDIT_CLIENT_SECRET,
   };
 }

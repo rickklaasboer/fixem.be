@@ -130,6 +130,8 @@ and edit as needed; every value has a sane default (see `src/lib/config.ts`).
 | `EXTRA_CRAWLER_UAS` | *(empty)* | Comma-separated extra `User-Agent` substrings (case-insensitive) to treat as crawlers, in addition to the built-in list. |
 | `TWITCH_CLIENT_ID` | *(empty)* | Twitch app client ID. Unused until M3 (clip embeds). |
 | `TWITCH_CLIENT_SECRET` | *(empty)* | Twitch app client secret. Unused until M3 (clip embeds). |
+| `REDDIT_CLIENT_ID` | *(empty)* | Reddit app client ID (optional). When set together with the secret, the Reddit adapter authenticates via OAuth (`oauth.reddit.com`) instead of anonymous JSON, which many networks IP-block. Register a "script" app at [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps). |
+| `REDDIT_CLIENT_SECRET` | *(empty)* | Reddit app client secret (optional, pairs with `REDDIT_CLIENT_ID`). |
 
 ### Redis outages degrade gracefully
 
@@ -217,7 +219,7 @@ and can break the tags crawlers parse. Leave `User-Agent` pass-through on.
 | Platform | Status | Coverage |
 |---|---|---|
 | `example.com` (dummy adapter) | Available now (M1) | Smoke-test target |
-| Reddit | Available now (M2) | Posts, galleries, video, crossposts, NSFW marker |
+| Reddit | Available now (M2) | Posts, galleries, video, crossposts, NSFW marker. Without `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`, Reddit may degrade to plain redirects depending on the server's IP reputation. |
 | Bluesky | Available now (M2) | Images, video thumbnail, quotes, external links |
 | Twitch, Twitter/X | Planned (M3) | — |
 | Threads, Instagram, TikTok | Planned (M4) | — |

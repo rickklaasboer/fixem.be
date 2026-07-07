@@ -130,4 +130,36 @@ describe("reddit adapter", () => {
     const ad = createRedditAdapter(fetchReturning({ error: 429 }, 429));
     expect(ad.resolve(new URL("https://www.reddit.com/r/x/comments/y/z/"))).rejects.toThrow("reddit 429");
   });
+
+  test("with creds: acquires token once and fetches via oauth.reddit.com", async () => {
+    const requests: { url: string; auth?: string }[] = [];
+    const fetchFn = (async (input: unknown, init?: RequestInit) => {
+      const url = String(input);
+      const headers = new Headers(init?.headers);
+      requests.push({ url, auth: headers.get("Authorization") ?? undefined });
+      if (url.includes("access_token")) {
+        return new Response(JSON.stringify({ access_token: "tok123", expires_in: 3600 }));
+      }
+      return new Response(JSON.stringify(imagePost));
+    }) as unknown as FetchFn;
+    const ad = createRedditAdapter(fetchFn, { clientId: "id", clientSecret: "secret" });
+    await ad.resolve(new URL("https://www.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea/"));
+    await ad.resolve(new URL("https://www.reddit.com/r/pics/comments/abc123/other/"));
+    const tokenCalls = requests.filter((r) => r.url.includes("access_token"));
+    expect(tokenCalls.length).toBe(1);
+    expect(tokenCalls[0]!.auth?.startsWith("Basic ")).toBe(true);
+    const apiCalls = requests.filter((r) => r.url.startsWith("https://oauth.reddit.com/"));
+    expect(apiCalls.length).toBe(2);
+    expect(apiCalls[0]!.url).toBe("https://oauth.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea.json?raw_json=1");
+    expect(apiCalls[0]!.auth).toBe("bearer tok123");
+  });
+
+  test("with creds: failed token acquisition throws (resolver degrades)", async () => {
+    const fetchFn = (async (input: unknown) => {
+      if (String(input).includes("access_token")) return new Response("nope", { status: 401 });
+      return new Response(JSON.stringify(imagePost));
+    }) as unknown as FetchFn;
+    const ad = createRedditAdapter(fetchFn, { clientId: "id", clientSecret: "bad" });
+    expect(ad.resolve(new URL("https://www.reddit.com/r/pics/comments/abc123/x/"))).rejects.toThrow();
+  });
 });

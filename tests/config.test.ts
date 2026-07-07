@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { loadConfig } from "../src/lib/config";
+import { TWITCH_GQL_DEFAULTS } from "../src/adapters/twitch";
 
 describe("loadConfig", () => {
   test("applies defaults for empty env", () => {
@@ -11,6 +12,8 @@ describe("loadConfig", () => {
     expect(c.rateLimitPerMin).toBe(60);
     expect(c.publicBaseUrl).toBe("https://fixem.be");
     expect(c.extraCrawlerUas).toEqual([]);
+    expect(c.twitchGqlClientId).toBe(TWITCH_GQL_DEFAULTS.clientId);
+    expect(c.twitchGqlClipHash).toBe(TWITCH_GQL_DEFAULTS.clipTokenHash);
   });
 
   test("reads overrides and parses extra UAs", () => {

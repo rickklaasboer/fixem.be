@@ -7,12 +7,14 @@ import { Resolver } from "./resolver";
 import { AdapterRegistry } from "./adapters/registry";
 import { createRedditAdapter } from "./adapters/reddit";
 import { createBlueskyAdapter } from "./adapters/bluesky";
+import { createTwitterAdapter } from "./adapters/twitter";
+import { createTwitchAdapter } from "./adapters/twitch";
 import { createDummyAdapter } from "./adapters/dummy";
 
 const config = loadConfig();
 const logger = createLogger();
 const cache = createRedisCache(config.redisUrl);
-const registry = new AdapterRegistry([
+const adapters = [
   createRedditAdapter(
     fetch,
     config.redditClientId && config.redditClientSecret
@@ -20,8 +22,23 @@ const registry = new AdapterRegistry([
       : undefined,
   ),
   createBlueskyAdapter(),
+  createTwitterAdapter(),
   createDummyAdapter(),
-]);
+];
+if (config.twitchClientId && config.twitchClientSecret) {
+  adapters.splice(
+    2,
+    0,
+    createTwitchAdapter(
+      { clientId: config.twitchClientId, clientSecret: config.twitchClientSecret },
+      fetch,
+      { clientId: config.twitchGqlClientId, clipTokenHash: config.twitchGqlClipHash },
+    ),
+  );
+} else {
+  logger.warn({}, "twitch adapter disabled: TWITCH_CLIENT_ID/SECRET not set");
+}
+const registry = new AdapterRegistry(adapters);
 const resolver = new Resolver({
   registry,
   cache,

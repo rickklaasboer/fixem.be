@@ -128,8 +128,10 @@ and edit as needed; every value has a sane default (see `src/lib/config.ts`).
 | `RESOLVE_TIMEOUT_MS` | `5000` | Per-adapter resolve timeout. A slower upstream degrades to a minimal embed rather than hanging. |
 | `RATE_LIMIT_PER_MIN` | `60` | Max requests per client IP per minute for non-crawler traffic. Crawlers are exempt. |
 | `EXTRA_CRAWLER_UAS` | *(empty)* | Comma-separated extra `User-Agent` substrings (case-insensitive) to treat as crawlers, in addition to the built-in list. |
-| `TWITCH_CLIENT_ID` | *(empty)* | Twitch app client ID. Unused until M3 (clip embeds). |
-| `TWITCH_CLIENT_SECRET` | *(empty)* | Twitch app client secret. Unused until M3 (clip embeds). |
+| `TWITCH_CLIENT_ID` | *(empty)* | Twitch app client ID. Required to enable Twitch clip embeds; register an app at [dev.twitch.tv/console](https://dev.twitch.tv/console). When it and the secret are unset the Twitch adapter is disabled (logged on startup) and Twitch links fall through. |
+| `TWITCH_CLIENT_SECRET` | *(empty)* | Twitch app client secret (pairs with `TWITCH_CLIENT_ID`). |
+| `TWITCH_GQL_CLIENT_ID` | *(pinned)* | Twitch's public web client ID, used for the clip video (GraphQL) call. Override **only** if Twitch rotates its public web constants; the pinned default lives in `src/adapters/twitch.ts`. |
+| `TWITCH_GQL_CLIP_HASH` | *(pinned)* | Persisted-query hash for the clip playback-access-token GraphQL call. Override **only** if Twitch rotates its public web constants. |
 | `REDDIT_CLIENT_ID` | *(empty)* | Reddit app client ID (optional). When set together with the secret, the Reddit adapter authenticates via OAuth (`oauth.reddit.com`) instead of anonymous JSON, which many networks IP-block. Register a "script" app at [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps). |
 | `REDDIT_CLIENT_SECRET` | *(empty)* | Reddit app client secret (optional, pairs with `REDDIT_CLIENT_ID`). |
 
@@ -221,16 +223,29 @@ and can break the tags crawlers parse. Leave `User-Agent` pass-through on.
 | `example.com` (dummy adapter) | Available now (M1) | Smoke-test target |
 | Reddit | Available now (M2) | Posts, galleries, video, crossposts, NSFW marker. Without `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`, Reddit may degrade to plain redirects depending on the server's IP reputation. |
 | Bluesky | Available now (M2) | Images, video thumbnail, quotes, external links |
-| Twitch, Twitter/X | Planned (M3) | — |
+| Twitch | Available now (M3) | Clips — title, broadcaster, view count, thumbnail, and inline MP4 (needs `TWITCH_CLIENT_ID`/`TWITCH_CLIENT_SECRET`). |
+| Twitter/X | Available now (M3) | Tweets — text, photos, inline MP4 video, quoted-tweet preview, NSFW marker. No credentials required. |
 | Threads, Instagram, TikTok | Planned (M4) | — |
 
 The dummy `example.com` adapter ships in M1 so the full pipeline can be verified
 end-to-end (including against real Discord) without any platform dependency.
-Reddit and Bluesky adapters land in M2; further platforms follow in M3/M4.
+Reddit and Bluesky adapters land in M2, Twitch and Twitter/X in M3; further
+platforms follow in M4.
 
 Bluesky video currently embeds as a **thumbnail** rather than an inline player:
 Bluesky serves video as HLS (`.m3u8`), which Discord's `og:video` player won't
 fetch. Direct playback arrives with the M4 video proxy.
+
+**Twitch** requires a Twitch app (`TWITCH_CLIENT_ID`/`TWITCH_CLIENT_SECRET`,
+registered at [dev.twitch.tv/console](https://dev.twitch.tv/console)); without
+them the adapter is disabled at startup and Twitch links fall through. Clip video
+is served through a short-lived **signed CDN URL**, so a resolved clip is cached
+for only ~30 minutes (the signature's lifetime) rather than the default 4 hours.
+
+**Twitter/X** needs no credentials — it reads the anonymous syndication API. As a
+limitation of that anonymous path, NSFW / age-restricted posts (and deleted or
+withheld ones) can't return media and degrade to a plain text notice instead of a
+full embed.
 
 ---
 

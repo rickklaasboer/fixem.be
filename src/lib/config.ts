@@ -1,3 +1,5 @@
+import { TWITCH_GQL_DEFAULTS } from "../adapters/twitch";
+
 export interface Config {
   port: number;
   redisUrl: string;
@@ -8,6 +10,8 @@ export interface Config {
   extraCrawlerUas: string[];
   twitchClientId?: string;
   twitchClientSecret?: string;
+  twitchGqlClientId: string;
+  twitchGqlClipHash: string;
   redditClientId?: string;
   redditClientSecret?: string;
 }
@@ -41,6 +45,8 @@ export function loadConfig(
       .filter(Boolean),
     twitchClientId: env.TWITCH_CLIENT_ID,
     twitchClientSecret: env.TWITCH_CLIENT_SECRET,
+    twitchGqlClientId: env.TWITCH_GQL_CLIENT_ID ?? TWITCH_GQL_DEFAULTS.clientId,
+    twitchGqlClipHash: env.TWITCH_GQL_CLIP_HASH ?? TWITCH_GQL_DEFAULTS.clipTokenHash,
     redditClientId: env.REDDIT_CLIENT_ID,
     redditClientSecret: env.REDDIT_CLIENT_SECRET,
   };

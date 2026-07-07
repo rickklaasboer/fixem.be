@@ -85,4 +85,13 @@ describe("bluesky adapter", () => {
     );
     expect(ad.resolve(POST_URL)).rejects.toThrow();
   });
+
+  test("empty displayName titles as just @handle", async () => {
+    const noName = structuredClone(postImages) as { thread: { post: { author: { displayName?: string } } } };
+    noName.thread.post.author.displayName = "";
+    const ad = createBlueskyAdapter(fakeFetch(noName));
+    const m = await ad.resolve(POST_URL);
+    expect(m.title).toBe("@alice.bsky.social");
+    expect(m.author?.name).toBe("alice.bsky.social");
+  });
 });

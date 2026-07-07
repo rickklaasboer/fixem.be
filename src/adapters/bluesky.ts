@@ -114,7 +114,12 @@ export function createBlueskyAdapter(fetchFn: FetchFn = fetch): PlatformAdapter 
 
       return {
         kind,
-        title: `${titlePrefix}${name} (@${handle})`,
+        // Accounts without a display name title as just "@handle" — not the
+        // duplicated "handle (@handle)".
+        title:
+          name === handle
+            ? `${titlePrefix}@${handle}`
+            : `${titlePrefix}${name} (@${handle})`,
         description: descParts.length ? descParts.join(" ") : undefined,
         author: { name, url: `https://bsky.app/profile/${handle}` },
         siteName: "Bluesky",

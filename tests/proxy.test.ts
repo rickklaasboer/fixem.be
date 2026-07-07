@@ -82,4 +82,48 @@ describe("/v/ proxy", () => {
     const tok = await tokenFor("https://v16.tiktokcdn.com/a.mp4");
     expect((await app.request(`/v/${tok}`)).status).toBe(502);
   });
+
+  test("404 when proxy secret is unset (disabled)", async () => {
+    const config = loadConfig({}); // no PROXY_SECRET
+    const app = new Hono();
+    mountProxy(app, { config, logger: silent, fetchFn: (async () => new Response("x")) as unknown as FetchFn, now: () => 1000 });
+    const tok = await signProxyToken("s", { url: "https://v16.tiktokcdn.com/a.mp4", headers: {}, exp: 2000 });
+    expect((await app.request(`/v/${tok}`)).status).toBe(404);
+  });
+
+  test("404 on expired token", async () => {
+    const app = await appWith((async () => new Response("x")) as unknown as FetchFn);
+    const expired = await signProxyToken(SECRET, { url: "https://v16.tiktokcdn.com/a.mp4", headers: {}, exp: 500 });
+    expect((await app.request(`/v/${expired}`)).status).toBe(404); // now()=1000 > exp=500
+  });
+
+  test("follows a redirect to an allowlisted host and re-validates each hop", async () => {
+    const hosts: string[] = [];
+    const fetchFn = (async (input: unknown) => {
+      const url = new URL(String(input));
+      hosts.push(url.hostname);
+      if (url.hostname === "v16.tiktokcdn.com") {
+        return new Response(null, { status: 302, headers: { location: "https://cdn.muscdn.com/signed.mp4" } });
+      }
+      return new Response("BYTES", { status: 200, headers: { "content-type": "video/mp4" } });
+    }) as unknown as FetchFn;
+    const app = await appWith(fetchFn);
+    const tok = await tokenFor("https://v16.tiktokcdn.com/a.mp4");
+    const res = await app.request(`/v/${tok}`);
+    expect(res.status).toBe(200);
+    expect(hosts).toEqual(["v16.tiktokcdn.com", "cdn.muscdn.com"]);
+    expect(await res.text()).toBe("BYTES");
+  });
+
+  test("403 when a redirect points off the allowlist (SSRF guard)", async () => {
+    const fetchFn = (async (input: unknown) => {
+      if (new URL(String(input)).hostname === "v16.tiktokcdn.com") {
+        return new Response(null, { status: 302, headers: { location: "http://169.254.169.254/latest/meta-data/" } });
+      }
+      return new Response("SECRET", { status: 200 });
+    }) as unknown as FetchFn;
+    const app = await appWith(fetchFn);
+    const tok = await tokenFor("https://v16.tiktokcdn.com/a.mp4");
+    expect((await app.request(`/v/${tok}`)).status).toBe(403);
+  });
 });

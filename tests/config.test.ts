@@ -29,4 +29,9 @@ describe("loadConfig", () => {
   test("falls back to default on non-numeric value", () => {
     expect(loadConfig({ PORT: "banana" }).port).toBe(3000);
   });
+
+  test("falls back to default on values below the sane floor", () => {
+    expect(loadConfig({ RATE_LIMIT_PER_MIN: "-1" }).rateLimitPerMin).toBe(60);
+    expect(loadConfig({ RESOLVE_TIMEOUT_MS: "0" }).resolveTimeoutMs).toBe(5000);
+  });
 });

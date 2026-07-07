@@ -36,6 +36,10 @@ export function buildApp(deps: AppDeps): Hono {
   app.get("/healthz", async (c) => c.json({ ok: true, redis: await cache.ping() }));
 
   app.get("/oembed", async (c) => {
+    if (!isCrawler(c.req.header("User-Agent"), config.extraCrawlerUas)) {
+      const hits = await rateLimitStore.hit(clientIp(c.req.raw.headers), 60_000, now());
+      if (hits > config.rateLimitPerMin) return c.text("rate limited, try again shortly", 429);
+    }
     const raw = c.req.query("url");
     if (!raw) return c.json({ error: "unknown url" }, 404);
     let url: URL;

@@ -108,6 +108,15 @@ describe("routes", () => {
     expect((await get(app, path, DISCORD_UA)).status).toBe(200); // crawler unaffected
   });
 
+  test("oembed is rate limited for browsers, crawlers exempt", async () => {
+    const config = loadConfig({ RATE_LIMIT_PER_MIN: "1" });
+    const app = makeApp({ config });
+    const path = "/oembed?url=https%3A%2F%2Fexample.com%2Fhello";
+    expect((await get(app, path, BROWSER_UA)).status).toBe(200);
+    expect((await get(app, path, BROWSER_UA)).status).toBe(429);
+    expect((await get(app, path, DISCORD_UA)).status).toBe(200); // crawler unaffected
+  });
+
   test("fixem=preview is rate limited like a browser", async () => {
     const config = loadConfig({ RATE_LIMIT_PER_MIN: "1" });
     const app = makeApp({ config });

@@ -16,15 +16,22 @@ function int(value: string | undefined, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// An operator typo (e.g. RATE_LIMIT_PER_MIN=0) must not brick the service:
+// values below a sane floor fall back to the default.
+function intMin(value: string | undefined, fallback: number, min: number): number {
+  const n = int(value, fallback);
+  return n < min ? fallback : n;
+}
+
 export function loadConfig(
   env: Record<string, string | undefined> = process.env,
 ): Config {
   return {
-    port: int(env.PORT, 3000),
+    port: intMin(env.PORT, 3000, 1),
     redisUrl: env.REDIS_URL ?? "redis://localhost:6379",
-    cacheTtlSeconds: int(env.CACHE_TTL_SECONDS, 14400),
-    resolveTimeoutMs: int(env.RESOLVE_TIMEOUT_MS, 5000),
-    rateLimitPerMin: int(env.RATE_LIMIT_PER_MIN, 60),
+    cacheTtlSeconds: intMin(env.CACHE_TTL_SECONDS, 14400, 1),
+    resolveTimeoutMs: intMin(env.RESOLVE_TIMEOUT_MS, 5000, 100),
+    rateLimitPerMin: intMin(env.RATE_LIMIT_PER_MIN, 60, 1),
     publicBaseUrl: env.PUBLIC_BASE_URL ?? "https://fixem.be",
     extraCrawlerUas: (env.EXTRA_CRAWLER_UAS ?? "")
       .split(",")

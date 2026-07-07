@@ -143,4 +143,20 @@ describe("Resolver", () => {
     if (out.status === "degraded") expect(out.reason).toBe("internal");
     expect(r.canonicalFor(new URL("https://fake.test/p"))).toBeNull();
   });
+
+  test("meta ttlSeconds hint caps the cache TTL", async () => {
+    const captured: number[] = [];
+    const cache = new MemoryCache();
+    const origSetEx = cache.setEx.bind(cache);
+    cache.setEx = async (k, ttl, v) => {
+      captured.push(ttl);
+      return origSetEx(k, ttl, v);
+    };
+    const { adapter } = fakeAdapter({
+      resolve: async () => ({ ...META, ttlSeconds: 60 }),
+    });
+    const r = makeResolver(adapter, { cache, ttlSeconds: 3600 });
+    await r.resolve(new URL("https://fake.test/p"));
+    expect(captured).toEqual([60]);
+  });
 });

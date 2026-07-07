@@ -118,7 +118,8 @@ export class Resolver {
     try {
       const meta = await withTimeout(adapter.resolve(url), this.opts.timeoutMs);
       this.failures.delete(platform);
-      await this.opts.cache.setEx(key, this.opts.ttlSeconds, JSON.stringify(meta));
+      const ttl = Math.min(meta.ttlSeconds ?? this.opts.ttlSeconds, this.opts.ttlSeconds);
+      await this.opts.cache.setEx(key, ttl, JSON.stringify(meta));
       this.opts.logger.info(
         { platform, cache: "miss", latencyMs: this.now() - started },
         "resolved",

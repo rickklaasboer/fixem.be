@@ -10,6 +10,9 @@ export interface EmbedMetadata {
   image?: { url: string; width?: number; height?: number };
   video?: { url: string; width?: number; height?: number; mimeType: string };
   nsfw?: boolean;
+  // Optional cache-TTL cap for results whose media URLs expire (e.g. signed
+  // CDN links). Consumed by the resolver; never rendered.
+  ttlSeconds?: number;
   originalUrl: string;
 }
 

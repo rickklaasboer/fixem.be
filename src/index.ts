@@ -22,7 +22,7 @@ const adapters = [
       : undefined,
   ),
   createBlueskyAdapter(),
-  createTwitterAdapter(),
+  createTwitterAdapter(fetch, config.twitterSyndicationFeatures),
   createDummyAdapter(),
 ];
 if (config.twitchClientId && config.twitchClientSecret) {

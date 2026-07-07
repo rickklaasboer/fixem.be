@@ -64,7 +64,10 @@ function parts(url: URL): { user: string; id: string } | null {
   return m ? { user: m[1]!, id: m[2]! } : null;
 }
 
-export function createTwitterAdapter(fetchFn: FetchFn = fetch): PlatformAdapter {
+export function createTwitterAdapter(
+  fetchFn: FetchFn = fetch,
+  features: string = SYNDICATION_FEATURES,
+): PlatformAdapter {
   return {
     name: "twitter",
     match(url) {
@@ -81,7 +84,7 @@ export function createTwitterAdapter(fetchFn: FetchFn = fetch): PlatformAdapter 
       const apiUrl =
         `https://cdn.syndication.twimg.com/tweet-result?id=${p.id}` +
         `&lang=en&token=${syndicationToken(p.id)}` +
-        `&features=${encodeURIComponent(SYNDICATION_FEATURES)}`;
+        `&features=${encodeURIComponent(features)}`;
       const res = await fetchFn(apiUrl, { headers: { "User-Agent": PLATFORM_UA } });
       if (!res.ok) throw new Error(`twitter ${res.status}`);
       const j = (await res.json()) as SynTweet;

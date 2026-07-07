@@ -1,4 +1,5 @@
 import { TWITCH_GQL_DEFAULTS } from "../adapters/twitch";
+import { SYNDICATION_FEATURES } from "../adapters/twitter";
 
 export interface Config {
   port: number;
@@ -12,6 +13,7 @@ export interface Config {
   twitchClientSecret?: string;
   twitchGqlClientId: string;
   twitchGqlClipHash: string;
+  twitterSyndicationFeatures: string;
   redditClientId?: string;
   redditClientSecret?: string;
 }
@@ -49,6 +51,9 @@ export function loadConfig(
     // still fall back to the pinned defaults.
     twitchGqlClientId: env.TWITCH_GQL_CLIENT_ID || TWITCH_GQL_DEFAULTS.clientId,
     twitchGqlClipHash: env.TWITCH_GQL_CLIP_HASH || TWITCH_GQL_DEFAULTS.clipTokenHash,
+    // `||` (not `??`): a copied .env.example leaves this as "", which must
+    // still fall back to the pinned default flag string.
+    twitterSyndicationFeatures: env.TWITTER_SYNDICATION_FEATURES || SYNDICATION_FEATURES,
     redditClientId: env.REDDIT_CLIENT_ID,
     redditClientSecret: env.REDDIT_CLIENT_SECRET,
   };

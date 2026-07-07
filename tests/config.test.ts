@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { loadConfig } from "../src/lib/config";
 import { TWITCH_GQL_DEFAULTS } from "../src/adapters/twitch";
+import { SYNDICATION_FEATURES } from "../src/adapters/twitter";
 
 describe("loadConfig", () => {
   test("applies defaults for empty env", () => {
@@ -31,6 +32,21 @@ describe("loadConfig", () => {
     expect(c.twitchClientId).toBe("abc");
     expect(c.redditClientId).toBe("rid");
     expect(c.redditClientSecret).toBe("rsecret");
+  });
+
+  test("blank Twitter syndication features fall back to the pinned default", () => {
+    // A copied .env.example leaves TWITTER_SYNDICATION_FEATURES as "" — that
+    // must not reach the adapter as a blank feature string.
+    expect(loadConfig({}).twitterSyndicationFeatures).toBe(SYNDICATION_FEATURES);
+    const c = loadConfig({ TWITTER_SYNDICATION_FEATURES: "" });
+    expect(c.twitterSyndicationFeatures).toBe(SYNDICATION_FEATURES);
+    expect(c.twitterSyndicationFeatures.length).toBeGreaterThan(0);
+    expect(c.twitterSyndicationFeatures).toContain("tfw_");
+  });
+
+  test("Twitter syndication features honor an env override", () => {
+    const c = loadConfig({ TWITTER_SYNDICATION_FEATURES: "tfw_custom:on" });
+    expect(c.twitterSyndicationFeatures).toBe("tfw_custom:on");
   });
 
   test("blank GQL overrides fall back to pinned defaults", () => {

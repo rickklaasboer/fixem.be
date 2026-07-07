@@ -132,6 +132,7 @@ and edit as needed; every value has a sane default (see `src/lib/config.ts`).
 | `TWITCH_CLIENT_SECRET` | *(empty)* | Twitch app client secret (pairs with `TWITCH_CLIENT_ID`). |
 | `TWITCH_GQL_CLIENT_ID` | *(pinned)* | Twitch's public web client ID, used for the clip video (GraphQL) call. Override **only** if Twitch rotates its public web constants; the pinned default lives in `src/adapters/twitch.ts`. |
 | `TWITCH_GQL_CLIP_HASH` | *(pinned)* | Persisted-query hash for the clip playback-access-token GraphQL call. Override **only** if Twitch rotates its public web constants. |
+| `TWITTER_SYNDICATION_FEATURES` | *(pinned)* | Semicolon-joined feature flags sent to the X/Twitter syndication endpoint. Override **only** if X changes the flags it requires; the pinned default lives in `src/adapters/twitter.ts`. |
 | `REDDIT_CLIENT_ID` | *(empty)* | Reddit app client ID (optional). When set together with the secret, the Reddit adapter authenticates via OAuth (`oauth.reddit.com`) instead of anonymous JSON, which many networks IP-block. Register a "script" app at [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps). |
 | `REDDIT_CLIENT_SECRET` | *(empty)* | Reddit app client secret (optional, pairs with `REDDIT_CLIENT_ID`). |
 

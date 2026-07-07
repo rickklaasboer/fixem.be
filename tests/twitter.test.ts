@@ -23,6 +23,7 @@ describe("twitter adapter", () => {
     expect(a.match(new URL("https://twitter.com/janedoe/status/123/photo/1"))).toBe(true);
     expect(a.match(new URL("https://mobile.twitter.com/janedoe/statuses/123"))).toBe(true);
     expect(a.match(new URL("https://x.com/janedoe"))).toBe(false);
+    expect(a.match(new URL("https://x.com/janedoe/status/123abc"))).toBe(false);
     expect(a.match(new URL("https://xcom.example/janedoe/status/123"))).toBe(false);
   });
 
@@ -84,6 +85,6 @@ describe("twitter adapter", () => {
 
   test("empty response throws", async () => {
     const ad = createTwitterAdapter(fakeFetch({}));
-    expect(ad.resolve(TWEET_URL)).rejects.toThrow("twitter: tweet unavailable");
+    await expect(ad.resolve(TWEET_URL)).rejects.toThrow("twitter: tweet unavailable");
   });
 });

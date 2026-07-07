@@ -9,7 +9,9 @@ const HOSTS = new Set([
   "www.x.com",
   "mobile.x.com",
 ]);
-const PATH_RE = /^\/([A-Za-z0-9_]{1,15})\/status(?:es)?\/(\d{1,20})/;
+// (?=\/|$) — a malformed ID like /status/123abc must not match-and-truncate
+// to tweet 123.
+const PATH_RE = /^\/([A-Za-z0-9_]{1,15})\/status(?:es)?\/(\d{1,20})(?=\/|$)/;
 const UA = "fixem.be/1.0 (embed fixer; +https://fixem.be)";
 
 // react-tweet's syndication feature flags — cosmetic but required (research §2a).

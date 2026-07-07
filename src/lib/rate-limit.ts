@@ -35,13 +35,17 @@ class RedisRateLimitStore implements RateLimitStore {
   }
 }
 
+// See createRedisCache: enableOfflineQueue false so a Redis outage fails
+// open immediately instead of stalling requests in the offline queue.
 export function createRedisRateLimitStore(url: string): RateLimitStore {
-  return new RedisRateLimitStore(new RedisClient(url));
+  return new RedisRateLimitStore(
+    new RedisClient(url, { enableOfflineQueue: false, connectionTimeout: 2000 }),
+  );
 }
 
 export function clientIp(headers: Headers): string {
-  const cf = headers.get("CF-Connecting-IP");
-  if (cf) return cf.trim();
+  const cf = headers.get("CF-Connecting-IP")?.trim();
+  if (cf) return cf;
   const xff = headers.get("X-Forwarded-For");
   if (xff) {
     const first = xff.split(",")[0]?.trim();

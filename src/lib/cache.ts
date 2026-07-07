@@ -64,6 +64,11 @@ class RedisCache implements MetadataCache {
   }
 }
 
+// enableOfflineQueue: false makes commands reject immediately while Redis is
+// unreachable (instead of queueing through reconnect backoff), so the
+// best-effort catch blocks fail open without stalling requests.
 export function createRedisCache(url: string): MetadataCache {
-  return new RedisCache(new RedisClient(url));
+  return new RedisCache(
+    new RedisClient(url, { enableOfflineQueue: false, connectionTimeout: 2000 }),
+  );
 }

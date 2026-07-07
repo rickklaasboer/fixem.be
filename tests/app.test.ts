@@ -56,6 +56,7 @@ describe("routes", () => {
     const html = await res.text();
     expect(html).toContain('og:title');
     expect(html).toContain("fixem.be works!");
+    expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
   });
 
   test("browser gets 302 to canonical URL for matched URL", async () => {
@@ -107,6 +108,14 @@ describe("routes", () => {
     expect((await get(app, path, DISCORD_UA)).status).toBe(200); // crawler unaffected
   });
 
+  test("fixem=preview is rate limited like a browser", async () => {
+    const config = loadConfig({ RATE_LIMIT_PER_MIN: "1" });
+    const app = makeApp({ config });
+    const path = "/https://example.com/hello?fixem=preview";
+    expect((await get(app, path, BROWSER_UA)).status).toBe(200);
+    expect((await get(app, path, BROWSER_UA)).status).toBe(429);
+  });
+
   test("degraded resolve serves minimal embed to crawler", async () => {
     const config = loadConfig({});
     const logger = createLogger({ write: () => {} });
@@ -130,5 +139,6 @@ describe("routes", () => {
     const res = await get(app, "/https://broken.test/post/1", DISCORD_UA);
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('content="https://broken.test/post/1"');
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
   });
 });

@@ -54,13 +54,18 @@ export function buildApp(deps: AppDeps): Hono {
     if (!parsed.ok) return c.text(USAGE_HINT, 400);
 
     const ua = c.req.header("User-Agent");
-    const wantsPreview =
-      isCrawler(ua, config.extraCrawlerUas) || c.req.query("fixem") === "preview";
+    const crawler = isCrawler(ua, config.extraCrawlerUas);
+    const preview = c.req.query("fixem") === "preview";
 
-    if (!wantsPreview) {
-      // Rate limit real browsers only; crawlers are exempt (spec §6).
+    if (!crawler) {
+      // Rate limit everything that isn't a known crawler — including
+      // ?fixem=preview, so the debug hatch can't bypass throttling into
+      // the resolver (spec §6).
       const hits = await rateLimitStore.hit(clientIp(c.req.raw.headers), 60_000, now());
       if (hits > config.rateLimitPerMin) return c.text("rate limited, try again shortly", 429);
+    }
+
+    if (!crawler && !preview) {
       const canonical = resolver.canonicalFor(parsed.url);
       return c.redirect(canonical?.canonicalUrl ?? parsed.url.href, 302);
     }
@@ -79,14 +84,15 @@ export function buildApp(deps: AppDeps): Hono {
       },
       "embed served",
     );
-    c.header("Cache-Control", "public, max-age=300");
+    // Don't let CDNs pin a transient failure for the full crawler TTL.
+    c.header("Cache-Control", outcome.status === "ok" ? "public, max-age=300" : "no-store");
     return c.html(renderMetaHtml(meta, { oembedUrl: oembedUrlFor(outcome.canonicalUrl) }));
   });
 
   app.onError((err, c) => {
     // Last-resort guard for the global invariant: never 500 on a well-formed URL.
     logger.error({ err: String(err), path: c.req.path }, "unhandled error, degrading");
-    const parsed = parseTargetUrl(c.req.path, "");
+    const parsed = parseTargetUrl(c.req.path, new URL(c.req.url).search.slice(1));
     if (parsed.ok) return c.redirect(parsed.url.href, 302);
     return c.text(USAGE_HINT, 400);
   });

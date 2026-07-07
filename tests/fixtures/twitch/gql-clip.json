@@ -1,0 +1,11 @@
+{
+  "data": {
+    "clip": {
+      "playbackAccessToken": { "value": "{\"authorization\":{}}", "signature": "deadbeefcafe" },
+      "videoQualities": [
+        { "frameRate": 60, "quality": "1080", "sourceURL": "https://production.assets.clips.twitchcdn.net/v2/media/xyz/1080.mp4" },
+        { "frameRate": 30, "quality": "480", "sourceURL": "https://production.assets.clips.twitchcdn.net/v2/media/xyz/480.mp4" }
+      ]
+    }
+  }
+}

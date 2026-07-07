@@ -9,6 +9,9 @@ import { parseTargetUrl } from "./url";
 import type { Resolver } from "./resolver";
 import { minimalMeta, renderMetaHtml } from "./render/meta-html";
 import { renderOembed } from "./render/oembed";
+import { mountProxy } from "./proxy";
+import { signProxyToken } from "./lib/proxy-sign";
+import type { EmbedMetadata } from "./adapters/types";
 
 export interface AppDeps {
   config: Config;
@@ -31,6 +34,26 @@ export function buildApp(deps: AppDeps): Hono {
   const oembedUrlFor = (canonicalUrl: string) =>
     `${config.publicBaseUrl}/oembed?url=${encodeURIComponent(canonicalUrl)}`;
 
+  const PROXY_TOKEN_TTL_MS = 3_600_000;
+  async function withProxiedVideo(meta: EmbedMetadata): Promise<EmbedMetadata> {
+    if (!meta.video?.proxyHeaders || !config.proxySecret) {
+      // No proxy configured/needed → strip the hint; if proxy is required but
+      // disabled, drop the video rather than emit an unplayable CDN URL.
+      if (meta.video?.proxyHeaders && !config.proxySecret) {
+        const { video, ...rest } = meta;
+        return { ...rest, kind: meta.kind === "video" ? "link" : meta.kind };
+      }
+      return meta;
+    }
+    const token = await signProxyToken(config.proxySecret, {
+      url: meta.video.url,
+      headers: meta.video.proxyHeaders,
+      exp: now() + PROXY_TOKEN_TTL_MS,
+    });
+    const { proxyHeaders, ...vid } = meta.video;
+    return { ...meta, video: { ...vid, url: `${config.publicBaseUrl}/v/${token}` } };
+  }
+
   app.get("/", (c) => c.html(landingHtml));
 
   app.get("/healthz", async (c) => c.json({ ok: true, redis: await cache.ping() }));
@@ -52,6 +75,8 @@ export function buildApp(deps: AppDeps): Hono {
     if (outcome.status !== "ok") return c.json({ error: "unknown url" }, 404);
     return c.json(renderOembed(outcome.meta, config.publicBaseUrl));
   });
+
+  mountProxy(app, { config, logger });
 
   app.get("*", async (c) => {
     const parsed = parseTargetUrl(c.req.path, new URL(c.req.url).search.slice(1));
@@ -82,7 +107,9 @@ export function buildApp(deps: AppDeps): Hono {
     if (outcome.status === "no-adapter") return c.redirect(parsed.url.href, 302);
 
     const meta =
-      outcome.status === "ok" ? outcome.meta : minimalMeta(outcome.canonicalUrl);
+      outcome.status === "ok"
+        ? await withProxiedVideo(outcome.meta)
+        : minimalMeta(outcome.canonicalUrl);
     logger.info(
       {
         platform: outcome.platform,

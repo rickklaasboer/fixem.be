@@ -185,3 +185,64 @@ test("reddit URL routes through app with fixture-backed adapter", async () => {
   const red = await get(app, "/https://old.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea/", BROWSER_UA);
   expect(red.headers.get("Location")).toBe("https://www.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea");
 });
+
+test("proxied video is rewritten to a signed /v/ URL", async () => {
+  const config = loadConfig({ PROXY_SECRET: "s", PUBLIC_BASE_URL: "https://fixem.be" });
+  const logger = createLogger({ write: () => {} });
+  const cache = new MemoryCache();
+  const proxAdapter = {
+    name: "prox",
+    match: (u: URL) => u.hostname === "prox.test",
+    canonicalize: (u: URL) => `https://prox.test${u.pathname}`,
+    resolve: async () => ({
+      kind: "video" as const,
+      title: "vid",
+      siteName: "Prox",
+      originalUrl: "https://prox.test/1",
+      video: {
+        url: "https://v16.tiktokcdn.com/a.mp4",
+        mimeType: "video/mp4",
+        proxyHeaders: { Referer: "https://www.tiktok.com/" },
+      },
+    }),
+  };
+  const resolver = new Resolver({
+    registry: new AdapterRegistry([proxAdapter]),
+    cache,
+    logger,
+    ttlSeconds: 60,
+    timeoutMs: 1000,
+  });
+  const app = makeApp({ config, resolver });
+  const res = await get(app, "/https://prox.test/1", DISCORD_UA);
+  const html = await res.text();
+  const m = html.match(/og:video" content="([^"]+)"/);
+  expect(m?.[1]).toStartWith("https://fixem.be/v/");
+  expect(html).not.toContain("v16.tiktokcdn.com"); // raw CDN URL never exposed
+});
+
+test("proxy-required video drops to link when PROXY_SECRET unset", async () => {
+  const config = loadConfig({}); // no PROXY_SECRET
+  const logger = createLogger({ write: () => {} });
+  const cache = new MemoryCache();
+  const proxAdapter = {
+    name: "prox",
+    match: (u: URL) => u.hostname === "prox.test",
+    canonicalize: (u: URL) => `https://prox.test${u.pathname}`,
+    resolve: async () => ({
+      kind: "video" as const,
+      title: "vid",
+      siteName: "Prox",
+      originalUrl: "https://prox.test/1",
+      video: { url: "https://v16.tiktokcdn.com/a.mp4", mimeType: "video/mp4", proxyHeaders: { Referer: "x" } },
+    }),
+  };
+  const resolver = new Resolver({
+    registry: new AdapterRegistry([proxAdapter]),
+    cache, logger, ttlSeconds: 60, timeoutMs: 1000,
+  });
+  const res = await get(makeApp({ config, resolver }), "/https://prox.test/1", DISCORD_UA);
+  const html = await res.text();
+  expect(html).not.toContain("og:video");
+  expect(html).not.toContain("tiktokcdn");
+});

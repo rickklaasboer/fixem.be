@@ -1,0 +1,14 @@
+{
+  "data": {
+    "xdt_shortcode_media": {
+      "__typename": "GraphImage",
+      "shortcode": "CabcDEF123",
+      "display_url": "https://scontent.cdninstagram.com/ig_image_full.jpg?efg=sig",
+      "dimensions": { "width": 1080, "height": 1350 },
+      "owner": { "username": "janedoe" },
+      "edge_media_to_caption": {
+        "edges": [{ "node": { "text": "Golden hour at the pier." } }]
+      }
+    }
+  }
+}

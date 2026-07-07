@@ -1,0 +1,15 @@
+{
+  "data": {
+    "xdt_shortcode_media": {
+      "__typename": "GraphVideo",
+      "shortcode": "CabcDEF456",
+      "display_url": "https://scontent.cdninstagram.com/ig_video_poster.jpg?efg=sig",
+      "video_url": "https://scontent.cdninstagram.com/ig_video_720.mp4?efg=sig&_nc_ht=x",
+      "dimensions": { "width": 720, "height": 1280 },
+      "owner": { "username": "johndoe" },
+      "edge_media_to_caption": {
+        "edges": [{ "node": { "text": "Slow-motion wave clip." } }]
+      }
+    }
+  }
+}

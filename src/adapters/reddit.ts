@@ -74,10 +74,18 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch): PlatformAdapter {
       const post = json[0]?.data?.children?.[0]?.data;
       if (!post) throw new Error("reddit: no post in response");
 
-      // Crossposts without their own media inherit the parent's.
+      // Crossposts: real video crossposts often carry a regenerated preview
+      // image on the child while the actual media lives in the parent —
+      // inherit whenever the parent has richer media, keeping the child's
+      // preview as poster fallback.
       const parent = post.crosspost_parent_list?.[0];
       let media = pickMedia(post);
-      if (media.kind === "link" && !media.image && parent) media = pickMedia(parent);
+      if (media.kind === "link" && parent) {
+        const parentMedia = pickMedia(parent);
+        if (parentMedia.kind !== "link") {
+          media = { ...parentMedia, image: parentMedia.image ?? media.image };
+        }
+      }
 
       const selftext = (post.selftext ?? "").trim();
       const descParts: string[] = [];

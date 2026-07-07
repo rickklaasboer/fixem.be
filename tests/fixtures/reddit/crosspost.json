@@ -4,6 +4,11 @@
   "subreddit": "videos",
   "over_18": true,
   "selftext": "",
+  "preview": {
+    "images": [
+      { "source": { "url": "https://external-preview.redd.it/xpost-poster.jpg?s=dd", "width": 1920, "height": 1080 } }
+    ]
+  },
   "crosspost_parent_list": [
     {
       "title": "Original clip",

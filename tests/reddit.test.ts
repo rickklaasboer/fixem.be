@@ -72,6 +72,8 @@ describe("reddit adapter", () => {
     const m = await ad.resolve(new URL("https://www.reddit.com/r/videos/comments/jkl012/x/"));
     expect(m.kind).toBe("video");
     expect(m.video?.url).toBe("https://v.redd.it/orig111/DASH_1080.mp4?source=fallback");
+    // child's regenerated preview must not block inheritance; it becomes the poster
+    expect(m.image?.url).toBe("https://external-preview.redd.it/xpost-poster.jpg?s=dd");
     expect(m.nsfw).toBe(true);
     expect(m.title).toBe("Crossposted clip");
   });

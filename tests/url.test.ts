@@ -58,4 +58,14 @@ describe("parseTargetUrl", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toBe("bad-scheme");
   });
+
+  test("re-attached params land before the fragment, not inside it", () => {
+    expect(ok("/https://example.com/x#section", "keep=1")).toBe(
+      "https://example.com/x?keep=1#section",
+    );
+  });
+
+  test("bare host without a path segment is unparseable", () => {
+    expect(parseTargetUrl("/example.com", "").ok).toBe(false);
+  });
 });

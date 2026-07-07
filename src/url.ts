@@ -21,7 +21,11 @@ export function parseTargetUrl(pathname: string, search: string): ParsedTarget {
   if (raw.includes("%")) {
     const decoded = tryDecode(raw);
     if (decoded === null) return { ok: false, reason: "unparseable" };
-    // after one decode, an encoded scheme/separator means the input was double-encoded
+    // Structural double-encoding check: an encoded scheme colon or slash
+    // surviving one decode means the URL's *structure* was double-encoded.
+    // Deeper double-encoding of ordinary characters intentionally passes
+    // through — it may be a legitimate literal %-sequence in the target —
+    // and the WHATWG host parser rejects any stray '%' in hostnames.
     if (/^https?%3a/i.test(decoded) || /%2f/i.test(decoded)) {
       return { ok: false, reason: "double-encoded" };
     }
@@ -44,7 +48,10 @@ export function parseTargetUrl(pathname: string, search: string): ParsedTarget {
   const params = new URLSearchParams(search);
   params.delete("fixem");
   const qs = params.toString();
-  const full = qs ? `${raw}${raw.includes("?") ? "&" : "?"}${qs}` : raw;
+  // Re-attached params must land before any fragment, never inside it.
+  const hashIdx = raw.indexOf("#");
+  const [base, frag] = hashIdx >= 0 ? [raw.slice(0, hashIdx), raw.slice(hashIdx)] : [raw, ""];
+  const full = qs ? `${base}${base.includes("?") ? "&" : "?"}${qs}${frag}` : raw;
 
   let url: URL;
   try {

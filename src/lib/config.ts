@@ -16,7 +16,17 @@ export interface Config {
   twitterSyndicationFeatures: string;
   redditClientId?: string;
   redditClientSecret?: string;
+  proxySecret: string;
+  proxyHostAllowlist: string[];
+  proxyMaxConcurrent: number;
+  proxyMaxBytes: number;
+  proxyTimeoutMs: number;
 }
+
+export const DEFAULT_PROXY_ALLOWLIST = [
+  "cdninstagram.com", "fbcdn.net", "tiktokcdn.com", "tiktokcdn-us.com",
+  "tiktokv.com", "tiktok.com", "muscdn.com", "byteoversea.com", "video.twimg.com",
+];
 
 function int(value: string | undefined, fallback: number): number {
   if (value === undefined) return fallback;
@@ -56,5 +66,12 @@ export function loadConfig(
     twitterSyndicationFeatures: env.TWITTER_SYNDICATION_FEATURES || SYNDICATION_FEATURES,
     redditClientId: env.REDDIT_CLIENT_ID,
     redditClientSecret: env.REDDIT_CLIENT_SECRET,
+    proxySecret: env.PROXY_SECRET ?? "",
+    proxyHostAllowlist: (env.PROXY_HOST_ALLOWLIST
+      ? env.PROXY_HOST_ALLOWLIST.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)
+      : DEFAULT_PROXY_ALLOWLIST),
+    proxyMaxConcurrent: intMin(env.PROXY_MAX_CONCURRENT, 32, 1),
+    proxyMaxBytes: intMin(env.PROXY_MAX_BYTES, 104857600, 1),
+    proxyTimeoutMs: intMin(env.PROXY_TIMEOUT_MS, 10000, 100),
   };
 }

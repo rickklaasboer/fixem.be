@@ -1,0 +1,72 @@
+import type { Hono } from "hono";
+import type { Config } from "./lib/config";
+import type { Logger } from "./lib/logger";
+import type { FetchFn } from "./adapters/types";
+import { verifyProxyToken } from "./lib/proxy-sign";
+
+const HOP_BY_HOP = new Set(["set-cookie", "authorization", "connection", "transfer-encoding"]);
+const PASS_THROUGH = ["content-type", "content-length", "content-range", "accept-ranges", "etag", "last-modified"];
+
+export function mountProxy(
+  app: Hono,
+  deps: { config: Config; logger: Logger; now?: () => number; fetchFn?: FetchFn },
+): void {
+  const { config, logger } = deps;
+  const now = deps.now ?? Date.now;
+  const fetchFn = deps.fetchFn ?? fetch;
+  let inflight = 0;
+
+  function hostAllowed(host: string): boolean {
+    const h = host.toLowerCase();
+    return config.proxyHostAllowlist.some((suffix) => h === suffix || h.endsWith(`.${suffix}`));
+  }
+
+  app.get("/v/:token", async (c) => {
+    if (!config.proxySecret) return c.text("proxy disabled", 404);
+    const payload = await verifyProxyToken(config.proxySecret, c.req.param("token"), now());
+    if (!payload) return c.text("not found", 404);
+
+    let target: URL;
+    try {
+      target = new URL(payload.url);
+    } catch {
+      return c.text("bad target", 400);
+    }
+    if (!hostAllowed(target.hostname)) return c.text("forbidden", 403);
+
+    if (inflight >= config.proxyMaxConcurrent) return c.text("busy", 503);
+    inflight++;
+    try {
+      const fwd = new Headers(payload.headers);
+      const range = c.req.header("Range");
+      if (range) fwd.set("Range", range);
+
+      const up = await fetchFn(target.href, {
+        headers: fwd,
+        redirect: "follow",
+        signal: AbortSignal.timeout(config.proxyTimeoutMs),
+      });
+      if (!up.ok && up.status !== 206) {
+        logger.warn({ host: target.hostname, status: up.status }, "proxy upstream error");
+        return c.text("bad gateway", 502);
+      }
+      const len = up.headers.get("content-length");
+      if (up.status === 200 && len && Number(len) > config.proxyMaxBytes) {
+        return c.text("bad gateway", 502);
+      }
+      const h = new Headers();
+      for (const k of PASS_THROUGH) {
+        const v = up.headers.get(k);
+        if (v && !HOP_BY_HOP.has(k)) h.set(k, v);
+      }
+      h.set("accept-ranges", "bytes");
+      h.set("cache-control", "public, max-age=3600");
+      return new Response(up.body, { status: up.status, headers: h });
+    } catch (err) {
+      logger.warn({ host: target.hostname, err: String(err) }, "proxy fetch failed");
+      return c.text("bad gateway", 502);
+    } finally {
+      inflight--;
+    }
+  });
+}

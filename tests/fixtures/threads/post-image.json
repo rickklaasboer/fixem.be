@@ -1,0 +1,26 @@
+{
+  "data": {
+    "data": {
+      "containing_thread": {
+        "thread_items": [
+          {
+            "post": {
+              "user": {
+                "username": "johndoe",
+                "profile_pic_url": "https://scontent.cdninstagram.com/avatar.jpg"
+              },
+              "caption": { "text": "A quiet morning by the lake." },
+              "image_versions2": {
+                "candidates": [
+                  { "url": "https://scontent.cdninstagram.com/image_full.jpg?efg=sig", "width": 1080, "height": 1350 }
+                ]
+              },
+              "original_width": 1080,
+              "original_height": 1350
+            }
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "data": {
+    "data": {
+      "containing_thread": {
+        "thread_items": [
+          {
+            "post": {
+              "user": {
+                "username": "janedoe",
+                "profile_pic_url": "https://scontent.cdninstagram.com/avatar2.jpg"
+              },
+              "caption": { "text": "Slow-motion wave at golden hour." },
+              "video_versions": [
+                { "type": 101, "url": "https://scontent.cdninstagram.com/video_720.mp4?efg=sig&_nc_ht=x" }
+              ],
+              "image_versions2": {
+                "candidates": [
+                  { "url": "https://scontent.cdninstagram.com/video_poster.jpg?efg=sig", "width": 720, "height": 1280 }
+                ]
+              },
+              "original_width": 720,
+              "original_height": 1280
+            }
+          }
+        ]
+      }
+    }
+  }
+}

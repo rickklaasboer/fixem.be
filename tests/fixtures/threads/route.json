@@ -1,0 +1,17 @@
+{
+  "payload": {
+    "payloads": {
+      "/@johndoe/post/ABC123": {
+        "result": {
+          "exports": {
+            "rootView": {
+              "props": {
+                "post_id": "31112223334"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

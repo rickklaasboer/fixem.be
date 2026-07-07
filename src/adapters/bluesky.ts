@@ -4,6 +4,9 @@ import { truncate } from "../lib/text";
 const API = "https://public.api.bsky.app/xrpc";
 const PATH_RE = /^\/profile\/([^/]+)\/post\/([^/]+)\/?$/;
 
+// Bluesky content labels (self- or moderation-applied) that mark a post adult.
+const NSFW_LABELS = new Set(["porn", "sexual", "nudity", "graphic-media"]);
+
 interface BskyAuthor {
   handle: string;
   displayName?: string;
@@ -15,6 +18,7 @@ interface BskyThreadResponse {
     post?: {
       author: BskyAuthor;
       record: { text?: string };
+      labels?: { val: string }[];
       embed?: {
         $type?: string;
         images?: { fullsize: string; aspectRatio?: { width: number; height: number } }[];
@@ -108,7 +112,12 @@ export function createBlueskyAdapter(fetchFn: FetchFn = fetch): PlatformAdapter 
         const quoted = embed?.record;
         if (quoted?.author?.handle) {
           const qText = (quoted.value?.text ?? "").trim();
-          descParts.push(`↪ @${quoted.author.handle}: ${truncate(qText, 120)}`);
+          // An empty quoted post would render a dangling "↪ @handle: ".
+          descParts.push(
+            qText
+              ? `↪ @${quoted.author.handle}: ${truncate(qText, 120)}`
+              : `↪ @${quoted.author.handle}`,
+          );
         }
       }
 
@@ -125,7 +134,7 @@ export function createBlueskyAdapter(fetchFn: FetchFn = fetch): PlatformAdapter 
         siteName: "Bluesky",
         themeColor: "#1185FE",
         image,
-        nsfw: false,
+        nsfw: (post.labels ?? []).some((l) => NSFW_LABELS.has(l.val)),
         originalUrl: this.canonicalize(url),
       };
     },

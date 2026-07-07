@@ -78,6 +78,44 @@ describe("reddit adapter", () => {
     expect(m.title).toBe("Crossposted clip");
   });
 
+  test("match covers np and sh reddit hosts", () => {
+    expect(a.match(new URL("https://np.reddit.com/r/pics/comments/abc"))).toBe(true);
+    expect(a.match(new URL("https://sh.reddit.com/r/pics/s/AbCdEf123"))).toBe(true);
+  });
+
+  test("mobile share link follows manual redirect to the permalink", async () => {
+    let calls = 0;
+    const fetchFn = (async (input: Parameters<FetchFn>[0], init?: RequestInit) => {
+      calls += 1;
+      if (calls === 1) {
+        expect(String(input)).toBe("https://www.reddit.com/r/pics/s/AbCdEf123");
+        expect(init?.redirect).toBe("manual");
+        return new Response(null, {
+          status: 307,
+          headers: {
+            Location:
+              "https://www.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea/?utm_source=share",
+          },
+        });
+      }
+      expect(String(input)).toBe(
+        "https://www.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea.json?raw_json=1",
+      );
+      return new Response(JSON.stringify(imagePost));
+    }) as unknown as FetchFn;
+    const ad = createRedditAdapter(fetchFn);
+    const m = await ad.resolve(new URL("https://www.reddit.com/r/pics/s/AbCdEf123"));
+    expect(m.title).toBe("A sunset over the sea");
+    expect(m.originalUrl).toBe("https://www.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea");
+  });
+
+  test("share link without redirect throws", async () => {
+    const ad = createRedditAdapter(fetchReturning({}, 200));
+    expect(ad.resolve(new URL("https://www.reddit.com/r/pics/s/AbCdEf123"))).rejects.toThrow(
+      "reddit: share link did not redirect",
+    );
+  });
+
   test("non-OK response throws", async () => {
     const ad = createRedditAdapter(fetchReturning({ error: 429 }, 429));
     expect(ad.resolve(new URL("https://www.reddit.com/r/x/comments/y/z/"))).rejects.toThrow("reddit 429");

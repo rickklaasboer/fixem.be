@@ -1,7 +1,20 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
 import { truncate } from "../lib/text";
 
-const HOSTS = new Set(["reddit.com", "www.reddit.com", "old.reddit.com", "new.reddit.com", "redd.it"]);
+const HOSTS = new Set([
+  "reddit.com",
+  "www.reddit.com",
+  "old.reddit.com",
+  "new.reddit.com",
+  "np.reddit.com",
+  "sh.reddit.com",
+  "redd.it",
+]);
+
+// Mobile share links (/r/<sub>/s/<token>) redirect to the real permalink.
+const SHARE_RE = /^\/r\/[^/]+\/s\/[^/]+\/?$/;
+
+const USER_AGENT = "fixem.be/1.0 (embed fixer; +https://fixem.be)";
 
 interface RedditPost {
   title: string;
@@ -62,12 +75,28 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch): PlatformAdapter {
       if (url.hostname === "redd.it") {
         return `https://www.reddit.com/comments/${url.pathname.replace(/^\/|\/$/g, "")}`;
       }
+      // Stays sync/net-free by design: share links cache under their share-URL canonical.
       return `https://www.reddit.com${url.pathname.replace(/\/$/, "")}`;
     },
     async resolve(url): Promise<EmbedMetadata> {
-      const canonical = this.canonicalize(url);
+      let canonical = this.canonicalize(url);
+      if (SHARE_RE.test(url.pathname)) {
+        // The .json endpoint 307s share links to a non-JSON target, so follow
+        // the redirect manually and resolve the real permalink instead.
+        const redirect = await fetchFn(canonical, {
+          headers: { "User-Agent": USER_AGENT },
+          redirect: "manual",
+        });
+        let target: URL;
+        try {
+          target = new URL(redirect.headers.get("Location") ?? "");
+        } catch {
+          throw new Error("reddit: share link did not redirect");
+        }
+        canonical = `https://www.reddit.com${target.pathname.replace(/\/$/, "")}`;
+      }
       const res = await fetchFn(`${canonical}.json?raw_json=1`, {
-        headers: { "User-Agent": "fixem.be/1.0 (embed fixer; +https://fixem.be)" },
+        headers: { "User-Agent": USER_AGENT },
       });
       if (!res.ok) throw new Error(`reddit ${res.status}`);
       const json = (await res.json()) as [{ data: { children: { data: RedditPost }[] } }, unknown];

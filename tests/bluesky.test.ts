@@ -86,6 +86,27 @@ describe("bluesky adapter", () => {
     expect(ad.resolve(POST_URL)).rejects.toThrow();
   });
 
+  test("content labels map to nsfw", async () => {
+    const labeled = structuredClone(postImages) as { thread: { post: { labels?: { val: string }[] } } };
+    labeled.thread.post.labels = [{ val: "porn" }];
+    const ad = createBlueskyAdapter(fakeFetch(labeled));
+    const m = await ad.resolve(POST_URL);
+    expect(m.nsfw).toBe(true);
+    // unlabeled fixture stays safe
+    const plain = await createBlueskyAdapter(fakeFetch(postImages)).resolve(POST_URL);
+    expect(plain.nsfw).toBe(false);
+  });
+
+  test("quote of an empty-text post omits the dangling colon", async () => {
+    const empty = structuredClone(postQuote) as {
+      thread: { post: { embed: { record: { value: { text: string } } } } };
+    };
+    empty.thread.post.embed.record.value.text = "";
+    const ad = createBlueskyAdapter(fakeFetch(empty));
+    const m = await ad.resolve(new URL("https://bsky.app/profile/carol.bsky.social/post/3kquo"));
+    expect(m.description?.endsWith("↪ @dave.bsky.social")).toBe(true);
+  });
+
   test("empty displayName titles as just @handle", async () => {
     const noName = structuredClone(postImages) as { thread: { post: { author: { displayName?: string } } } };
     noName.thread.post.author.displayName = "";

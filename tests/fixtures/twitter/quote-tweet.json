@@ -1,0 +1,11 @@
+{
+  "__typename": "Tweet",
+  "text": "This.",
+  "possibly_sensitive": false,
+  "user": { "name": "Carol", "screen_name": "carol" },
+  "photos": [],
+  "quoted_tweet": {
+    "text": "Original hot take about embeds.",
+    "user": { "name": "Dave", "screen_name": "dave" }
+  }
+}

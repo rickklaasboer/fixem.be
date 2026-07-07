@@ -1,0 +1,22 @@
+{
+  "__typename": "Tweet",
+  "text": "Watch this",
+  "possibly_sensitive": true,
+  "user": { "name": "Vid Guy", "screen_name": "vidguy" },
+  "photos": [],
+  "mediaDetails": [
+    {
+      "type": "video",
+      "media_url_https": "https://pbs.twimg.com/ext_tw_video_thumb/poster.jpg",
+      "original_info": { "width": 1280, "height": 720 },
+      "video_info": {
+        "aspect_ratio": [16, 9],
+        "variants": [
+          { "content_type": "application/x-mpegURL", "url": "https://video.twimg.com/pl.m3u8" },
+          { "bitrate": 832000, "content_type": "video/mp4", "url": "https://video.twimg.com/vid-832.mp4" },
+          { "bitrate": 2176000, "content_type": "video/mp4", "url": "https://video.twimg.com/vid-2176.mp4" }
+        ]
+      }
+    }
+  ]
+}

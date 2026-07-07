@@ -80,7 +80,7 @@ export function buildApp(deps: AppDeps): Hono {
         platform: outcome.platform,
         outcome: outcome.status,
         cache: outcome.status === "ok" ? (outcome.cacheHit ? "hit" : "miss") : "n/a",
-        uaClass: "crawler",
+        uaClass: crawler ? "crawler" : "preview",
       },
       "embed served",
     );

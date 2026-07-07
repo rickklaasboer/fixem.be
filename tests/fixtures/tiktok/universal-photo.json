@@ -1,0 +1,40 @@
+{
+  "__DEFAULT_SCOPE__": {
+    "webapp.video-detail": {
+      "statusCode": 0,
+      "itemInfo": {
+        "itemStruct": {
+          "id": "7322234567890123456",
+          "desc": "Weekend photo dump",
+          "author": {
+            "nickname": "Photo Guy",
+            "uniqueId": "photoguy"
+          },
+          "imagePost": {
+            "title": "Weekend photo dump",
+            "images": [
+              {
+                "imageURL": {
+                  "urlList": [
+                    "https://p16-sign.tiktokcdn.com/photo1_full.jpg?x-expires=1",
+                    "https://p16-sign.tiktokcdn.com/photo1_alt.jpg?x-expires=1"
+                  ]
+                }
+              },
+              {
+                "imageURL": {
+                  "urlList": ["https://p16-sign.tiktokcdn.com/photo2_full.jpg?x-expires=1"]
+                }
+              },
+              {
+                "imageURL": {
+                  "urlList": ["https://p16-sign.tiktokcdn.com/photo3_full.jpg?x-expires=1"]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

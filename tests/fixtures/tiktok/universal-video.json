@@ -1,0 +1,51 @@
+{
+  "__DEFAULT_SCOPE__": {
+    "webapp.video-detail": {
+      "statusCode": 0,
+      "itemInfo": {
+        "itemStruct": {
+          "id": "7311234567890123456",
+          "desc": "Sunset timelapse from the rooftop 🌇",
+          "author": {
+            "nickname": "Jane Traveler",
+            "uniqueId": "janetravels"
+          },
+          "video": {
+            "width": 576,
+            "height": 1024,
+            "duration": 15000,
+            "cover": "https://p16-sign.tiktokcdn.com/cover_720.jpg?x-expires=1",
+            "originCover": "https://p16-sign.tiktokcdn.com/origin_cover.jpg?x-expires=1",
+            "playAddr": "https://v16-webapp.tiktokcdn.com/fallback_play.mp4?a=1",
+            "bitrateInfo": [
+              {
+                "Bitrate": 516000,
+                "CodecType": "h264",
+                "PlayAddr": {
+                  "DataSize": 1000000,
+                  "UrlList": ["https://v16-webapp.tiktokcdn.com/low_516.mp4?a=1"]
+                }
+              },
+              {
+                "Bitrate": 1200000,
+                "CodecType": "h264",
+                "PlayAddr": {
+                  "DataSize": 2500000,
+                  "UrlList": ["https://v16-webapp.tiktokcdn.com/high_1200.mp4?a=1"]
+                }
+              },
+              {
+                "Bitrate": 780000,
+                "CodecType": "h264",
+                "PlayAddr": {
+                  "DataSize": 1600000,
+                  "UrlList": ["https://v16-webapp.tiktokcdn.com/mid_780.mp4?a=1"]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

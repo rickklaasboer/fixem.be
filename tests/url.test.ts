@@ -66,6 +66,8 @@ describe("parseTargetUrl", () => {
   });
 
   test("bare host without a path segment is unparseable", () => {
-    expect(parseTargetUrl("/example.com", "").ok).toBe(false);
+    const r = parseTargetUrl("/example.com", "");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe("unparseable");
   });
 });

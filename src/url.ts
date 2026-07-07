@@ -25,7 +25,10 @@ export function parseTargetUrl(pathname: string, search: string): ParsedTarget {
     // surviving one decode means the URL's *structure* was double-encoded.
     // Deeper double-encoding of ordinary characters intentionally passes
     // through — it may be a legitimate literal %-sequence in the target —
-    // and the WHATWG host parser rejects any stray '%' in hostnames.
+    // and any percent-sequence remaining in the hostname is either decoded
+    // to a valid domain code point by the WHATWG host parser or causes
+    // rejection: the final url.hostname is always the fully-decoded fetch
+    // target that adapter matching (stage 2) sees.
     if (/^https?%3a/i.test(decoded) || /%2f/i.test(decoded)) {
       return { ok: false, reason: "double-encoded" };
     }

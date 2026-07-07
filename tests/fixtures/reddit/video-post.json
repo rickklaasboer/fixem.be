@@ -1,0 +1,22 @@
+{
+  "title": "Cat does a backflip",
+  "author": "catlover",
+  "subreddit": "aww",
+  "over_18": false,
+  "is_video": true,
+  "selftext": "",
+  "secure_media": {
+    "reddit_video": {
+      "fallback_url": "https://v.redd.it/xyz789/DASH_720.mp4?source=fallback",
+      "width": 720,
+      "height": 1280,
+      "duration": 14
+    }
+  },
+  "preview": {
+    "images": [
+      { "source": { "url": "https://external-preview.redd.it/poster789.jpg?s=cafe", "width": 720, "height": 1280 } }
+    ]
+  },
+  "permalink": "/r/aww/comments/def456/cat_does_a_backflip/"
+}

@@ -1,0 +1,28 @@
+[
+  {
+    "kind": "Listing",
+    "data": {
+      "children": [
+        {
+          "kind": "t3",
+          "data": {
+            "title": "A sunset over the sea",
+            "author": "photofan",
+            "subreddit": "pics",
+            "over_18": false,
+            "post_hint": "image",
+            "selftext": "",
+            "url_overridden_by_dest": "https://i.redd.it/sunset123.jpg",
+            "preview": {
+              "images": [
+                { "source": { "url": "https://preview.redd.it/sunset123.jpg?auto=webp&s=deadbeef", "width": 1200, "height": 800 } }
+              ]
+            },
+            "permalink": "/r/pics/comments/abc123/a_sunset_over_the_sea/"
+          }
+        }
+      ]
+    }
+  },
+  { "kind": "Listing", "data": { "children": [] } }
+]

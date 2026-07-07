@@ -1,0 +1,22 @@
+{
+  "title": "Crossposted clip",
+  "author": "reposter",
+  "subreddit": "videos",
+  "over_18": true,
+  "selftext": "",
+  "crosspost_parent_list": [
+    {
+      "title": "Original clip",
+      "author": "original",
+      "subreddit": "somewhere",
+      "secure_media": {
+        "reddit_video": {
+          "fallback_url": "https://v.redd.it/orig111/DASH_1080.mp4?source=fallback",
+          "width": 1920,
+          "height": 1080
+        }
+      }
+    }
+  ],
+  "permalink": "/r/videos/comments/jkl012/crossposted_clip/"
+}

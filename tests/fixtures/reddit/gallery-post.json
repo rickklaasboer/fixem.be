@@ -1,0 +1,15 @@
+{
+  "title": "Trip photos",
+  "author": "traveler",
+  "subreddit": "travel",
+  "over_18": false,
+  "is_gallery": true,
+  "selftext": "Three days in Lisbon.",
+  "gallery_data": { "items": [ { "media_id": "m1" }, { "media_id": "m2" }, { "media_id": "m3" } ] },
+  "media_metadata": {
+    "m1": { "s": { "u": "https://preview.redd.it/m1.jpg?width=640&s=aa", "x": 640, "y": 480 } },
+    "m2": { "s": { "u": "https://preview.redd.it/m2.jpg?width=640&s=bb", "x": 640, "y": 480 } },
+    "m3": { "s": { "u": "https://preview.redd.it/m3.jpg?width=640&s=cc", "x": 640, "y": 480 } }
+  },
+  "permalink": "/r/travel/comments/ghi789/trip_photos/"
+}

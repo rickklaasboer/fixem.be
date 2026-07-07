@@ -130,4 +130,17 @@ describe("Resolver", () => {
     expect(miss.status).toBe("degraded");
     if (miss.status === "degraded") expect(miss.reason).toBe("breaker-open");
   });
+
+  test("throwing canonicalize degrades instead of throwing", async () => {
+    const { adapter } = fakeAdapter({
+      canonicalize: () => {
+        throw new Error("bad canonicalize");
+      },
+    });
+    const r = makeResolver(adapter);
+    const out = await r.resolve(new URL("https://fake.test/p"));
+    expect(out.status).toBe("degraded");
+    if (out.status === "degraded") expect(out.reason).toBe("internal");
+    expect(r.canonicalFor(new URL("https://fake.test/p"))).toBeNull();
+  });
 });

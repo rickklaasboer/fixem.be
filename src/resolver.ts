@@ -49,12 +49,31 @@ export class Resolver {
   }
 
   canonicalFor(url: URL): { canonicalUrl: string; platform: string } | null {
-    const adapter = this.opts.registry.find(url);
-    if (!adapter) return null;
-    return { canonicalUrl: adapter.canonicalize(url), platform: adapter.name };
+    try {
+      const adapter = this.opts.registry.find(url);
+      if (!adapter) return null;
+      return { canonicalUrl: adapter.canonicalize(url), platform: adapter.name };
+    } catch {
+      // a throwing match()/canonicalize() degrades to "no adapter"
+      return null;
+    }
   }
 
+  // Top-level guard: the "failures degrade, never throw" invariant must hold
+  // even if an adapter's match()/canonicalize() or the cache itself throws.
   async resolve(url: URL): Promise<ResolveOutcome> {
+    try {
+      return await this.resolveInner(url);
+    } catch (err) {
+      this.opts.logger.error(
+        { err: String(err), url: url.href },
+        "resolver internal error, degrading",
+      );
+      return { status: "degraded", canonicalUrl: url.href, platform: "unknown", reason: "internal" };
+    }
+  }
+
+  private async resolveInner(url: URL): Promise<ResolveOutcome> {
     const adapter = this.opts.registry.find(url);
     if (!adapter) return { status: "no-adapter" };
     const canonicalUrl = adapter.canonicalize(url);

@@ -1,0 +1,66 @@
+import { RedisClient } from "bun";
+
+export interface MetadataCache {
+  get(key: string): Promise<string | null>;
+  setEx(key: string, ttlSeconds: number, value: string): Promise<void>;
+  ping(): Promise<boolean>;
+}
+
+export class MemoryCache implements MetadataCache {
+  private store = new Map<string, { value: string; expiresAt: number }>();
+
+  constructor(private readonly now: () => number = Date.now) {}
+
+  async get(key: string): Promise<string | null> {
+    const e = this.store.get(key);
+    if (!e) return null;
+    if (this.now() > e.expiresAt) {
+      this.store.delete(key);
+      return null;
+    }
+    return e.value;
+  }
+
+  async setEx(key: string, ttlSeconds: number, value: string): Promise<void> {
+    this.store.set(key, { value, expiresAt: this.now() + ttlSeconds * 1000 });
+  }
+
+  async ping(): Promise<boolean> {
+    return true;
+  }
+}
+
+// Redis-backed cache. Every operation is best-effort: a Redis outage must
+// degrade to cache-less resolution, never break a request (spec §4).
+class RedisCache implements MetadataCache {
+  constructor(private readonly client: RedisClient) {}
+
+  async get(key: string): Promise<string | null> {
+    try {
+      const v = await this.client.send("GET", [key]);
+      return typeof v === "string" ? v : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async setEx(key: string, ttlSeconds: number, value: string): Promise<void> {
+    try {
+      await this.client.send("SET", [key, value, "EX", String(ttlSeconds)]);
+    } catch {
+      // best-effort
+    }
+  }
+
+  async ping(): Promise<boolean> {
+    try {
+      return (await this.client.send("PING", [])) === "PONG";
+    } catch {
+      return false;
+    }
+  }
+}
+
+export function createRedisCache(url: string): MetadataCache {
+  return new RedisCache(new RedisClient(url));
+}

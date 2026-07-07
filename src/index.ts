@@ -5,12 +5,18 @@ import { createRedisCache } from "./lib/cache";
 import { createRedisRateLimitStore } from "./lib/rate-limit";
 import { Resolver } from "./resolver";
 import { AdapterRegistry } from "./adapters/registry";
+import { createRedditAdapter } from "./adapters/reddit";
+import { createBlueskyAdapter } from "./adapters/bluesky";
 import { createDummyAdapter } from "./adapters/dummy";
 
 const config = loadConfig();
 const logger = createLogger();
 const cache = createRedisCache(config.redisUrl);
-const registry = new AdapterRegistry([createDummyAdapter()]);
+const registry = new AdapterRegistry([
+  createRedditAdapter(),
+  createBlueskyAdapter(),
+  createDummyAdapter(),
+]);
 const resolver = new Resolver({
   registry,
   cache,

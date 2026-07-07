@@ -142,3 +142,28 @@ describe("routes", () => {
     expect(res.headers.get("Cache-Control")).toBe("no-store");
   });
 });
+
+test("reddit URL routes through app with fixture-backed adapter", async () => {
+  const { createRedditAdapter } = await import("../src/adapters/reddit");
+  const imagePost = (await import("./fixtures/reddit/image-post.json")).default;
+  const fetchFn = (async () => new Response(JSON.stringify(imagePost))) as unknown as typeof fetch;
+  const config = loadConfig({});
+  const logger = createLogger({ write: () => {} });
+  const cache = new MemoryCache();
+  const resolver = new Resolver({
+    registry: new AdapterRegistry([createRedditAdapter(fetchFn)]),
+    cache,
+    logger,
+    ttlSeconds: 60,
+    timeoutMs: 1000,
+  });
+  const app = makeApp({ resolver });
+  const res = await get(app, "/https://old.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea/?utm=1", DISCORD_UA);
+  expect(res.status).toBe(200);
+  const html = await res.text();
+  expect(html).toContain("A sunset over the sea");
+  expect(html).toContain("Reddit • r/pics");
+  // browser hits canonical
+  const red = await get(app, "/https://old.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea/", BROWSER_UA);
+  expect(red.headers.get("Location")).toBe("https://www.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea");
+});

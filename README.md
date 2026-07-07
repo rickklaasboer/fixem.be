@@ -211,16 +211,21 @@ and can break the tags crawlers parse. Leave `User-Agent` pass-through on.
 
 ## Supported platforms
 
-| Platform | Status |
-|---|---|
-| `example.com` (dummy adapter) | Available now (M1) — smoke-test target |
-| Reddit | Coming in M2 |
-| Bluesky | Coming in M2 |
-| Additional platforms (e.g. Twitch clips, and more) | Later (M3 / M4) |
+| Platform | Status | Coverage |
+|---|---|---|
+| `example.com` (dummy adapter) | Available now (M1) | Smoke-test target |
+| Reddit | Available now (M2) | Posts, galleries, video, crossposts, NSFW marker |
+| Bluesky | Available now (M2) | Images, video thumbnail, quotes, external links |
+| Twitch, Twitter/X | Planned (M3) | — |
+| Threads, Instagram, TikTok | Planned (M4) | — |
 
 The dummy `example.com` adapter ships in M1 so the full pipeline can be verified
 end-to-end (including against real Discord) without any platform dependency.
 Reddit and Bluesky adapters land in M2; further platforms follow in M3/M4.
+
+Bluesky video currently embeds as a **thumbnail** rather than an inline player:
+Bluesky serves video as HLS (`.m3u8`), which Discord's `og:video` player won't
+fetch. Direct playback arrives with the M4 video proxy.
 
 ---
 

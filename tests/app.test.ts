@@ -186,6 +186,37 @@ test("reddit URL routes through app with fixture-backed adapter", async () => {
   expect(red.headers.get("Location")).toBe("https://www.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea");
 });
 
+test("tiktok URL routes through the full app with a fixture-backed adapter", async () => {
+  const { createTiktokAdapter, TIKTOK_DEFAULTS } = await import("../src/adapters/tiktok");
+  const fixture = (await import("./fixtures/tiktok/universal-video.json")).default;
+  // TikTok ships the post JSON inside a <script> tag in the page HTML.
+  const page =
+    `<!doctype html><html><body>` +
+    `<script id="${TIKTOK_DEFAULTS.rehydrationScriptId}" type="application/json">${JSON.stringify(fixture)}</script>` +
+    `</body></html>`;
+  const fetchFn = (async () => new Response(page, { status: 200 })) as unknown as typeof fetch;
+  const config = loadConfig({ PROXY_SECRET: "s", PUBLIC_BASE_URL: "https://fixem.be" });
+  const logger = createLogger({ write: () => {} });
+  const cache = new MemoryCache();
+  const resolver = new Resolver({
+    registry: new AdapterRegistry([createTiktokAdapter(fetchFn)]),
+    cache,
+    logger,
+    ttlSeconds: 60,
+    timeoutMs: 1000,
+  });
+  const app = makeApp({ config, resolver });
+  const res = await get(app, "/https://www.tiktok.com/@janetravels/video/7311234567890123456", DISCORD_UA);
+  expect(res.status).toBe(200);
+  const html = await res.text();
+  expect(html).toContain("Jane Traveler (@janetravels)");
+  expect(html).toContain("TikTok");
+  // inline video is wrapped in the signed /v/ proxy; raw CDN URL never exposed
+  const m = html.match(/og:video" content="([^"]+)"/);
+  expect(m?.[1]).toStartWith("https://fixem.be/v/");
+  expect(html).not.toContain("v16-webapp.tiktokcdn.com");
+});
+
 test("proxied video is rewritten to a signed /v/ URL", async () => {
   const config = loadConfig({ PROXY_SECRET: "s", PUBLIC_BASE_URL: "https://fixem.be" });
   const logger = createLogger({ write: () => {} });

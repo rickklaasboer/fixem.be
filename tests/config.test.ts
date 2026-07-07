@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { loadConfig } from "../src/lib/config";
 import { TWITCH_GQL_DEFAULTS } from "../src/adapters/twitch";
 import { SYNDICATION_FEATURES } from "../src/adapters/twitter";
+import { THREADS_DEFAULTS } from "../src/adapters/threads";
+import { TIKTOK_DEFAULTS } from "../src/adapters/tiktok";
+import { INSTAGRAM_DEFAULTS } from "../src/adapters/instagram";
 
 describe("loadConfig", () => {
   test("applies defaults for empty env", () => {
@@ -55,6 +58,31 @@ describe("loadConfig", () => {
     const c = loadConfig({ TWITCH_GQL_CLIENT_ID: "", TWITCH_GQL_CLIP_HASH: "" });
     expect(c.twitchGqlClientId).toBe("kimne78kx3ncx6brgo4mv6wki5h1ko");
     expect(c.twitchGqlClipHash.length).toBe(64);
+  });
+
+  test("Threads/TikTok/Instagram adapter constants default to the pinned values", () => {
+    const c = loadConfig({});
+    // one default-sanity assertion per new platform
+    expect(c.threads.docId).toBe(THREADS_DEFAULTS.docId);
+    expect(c.tiktok.deviceId).toBe(TIKTOK_DEFAULTS.deviceId);
+    expect(c.tiktok.rehydrationScriptId).toBe(TIKTOK_DEFAULTS.rehydrationScriptId);
+    expect(c.instagram.docId).toBe(INSTAGRAM_DEFAULTS.docId);
+    expect(c.instagram.proxyUrl).toBeUndefined();
+  });
+
+  test("blank adapter-constant overrides fall back to pinned defaults", () => {
+    // `cp .env.example .env` leaves these as empty strings — must not reach the
+    // adapters as blank constants.
+    const c = loadConfig({ THREADS_LSD: "", TIKTOK_IID: "", INSTAGRAM_APP_ID: "" });
+    expect(c.threads.lsd).toBe(THREADS_DEFAULTS.lsd);
+    expect(c.tiktok.iid).toBe(TIKTOK_DEFAULTS.iid);
+    expect(c.instagram.appId).toBe(INSTAGRAM_DEFAULTS.appId);
+  });
+
+  test("adapter constants honor env overrides", () => {
+    const c = loadConfig({ THREADS_DOC_ID: "custom-doc", INSTAGRAM_PROXY_URL: "https://proxy.test/?u=" });
+    expect(c.threads.docId).toBe("custom-doc");
+    expect(c.instagram.proxyUrl).toBe("https://proxy.test/?u=");
   });
 
   test("falls back to default on non-numeric value", () => {

@@ -1,5 +1,8 @@
 import { TWITCH_GQL_DEFAULTS } from "../adapters/twitch";
 import { SYNDICATION_FEATURES } from "../adapters/twitter";
+import { THREADS_DEFAULTS, type ThreadsConfig } from "../adapters/threads";
+import { TIKTOK_DEFAULTS, type TiktokConfig } from "../adapters/tiktok";
+import { INSTAGRAM_DEFAULTS, type InstagramConfig } from "../adapters/instagram";
 
 export interface Config {
   port: number;
@@ -21,6 +24,9 @@ export interface Config {
   proxyMaxConcurrent: number;
   proxyMaxBytes: number;
   proxyTimeoutMs: number;
+  threads: ThreadsConfig;
+  tiktok: TiktokConfig;
+  instagram: InstagramConfig;
 }
 
 export const DEFAULT_PROXY_ALLOWLIST = [
@@ -73,5 +79,27 @@ export function loadConfig(
     proxyMaxConcurrent: intMin(env.PROXY_MAX_CONCURRENT, 32, 1),
     proxyMaxBytes: intMin(env.PROXY_MAX_BYTES, 104857600, 1),
     proxyTimeoutMs: intMin(env.PROXY_TIMEOUT_MS, 10000, 100),
+    // Version-fragile pinned web-client constants (see each adapter's *_DEFAULTS).
+    // `||` (not `??`): a copied .env.example leaves these blank, which must still
+    // fall back to the pinned defaults.
+    threads: {
+      lsd: env.THREADS_LSD || THREADS_DEFAULTS.lsd,
+      docId: env.THREADS_DOC_ID || THREADS_DEFAULTS.docId,
+      appId: env.THREADS_APP_ID || THREADS_DEFAULTS.appId,
+      friendlyName: env.THREADS_FRIENDLY_NAME || THREADS_DEFAULTS.friendlyName,
+    },
+    tiktok: {
+      rehydrationScriptId: TIKTOK_DEFAULTS.rehydrationScriptId,
+      mobileApiHost: env.TIKTOK_MOBILE_API_HOST || TIKTOK_DEFAULTS.mobileApiHost,
+      iid: env.TIKTOK_IID || TIKTOK_DEFAULTS.iid,
+      deviceId: env.TIKTOK_DEVICE_ID || TIKTOK_DEFAULTS.deviceId,
+    },
+    instagram: {
+      docId: env.INSTAGRAM_DOC_ID || INSTAGRAM_DEFAULTS.docId,
+      appId: env.INSTAGRAM_APP_ID || INSTAGRAM_DEFAULTS.appId,
+      friendlyName: env.INSTAGRAM_FRIENDLY_NAME || INSTAGRAM_DEFAULTS.friendlyName,
+      // Optional residential-proxy offload; unset means direct fetch.
+      proxyUrl: env.INSTAGRAM_PROXY_URL || undefined,
+    },
   };
 }

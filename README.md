@@ -135,6 +135,15 @@ and edit as needed; every value has a sane default (see `src/lib/config.ts`).
 | `TWITTER_SYNDICATION_FEATURES` | *(pinned)* | Semicolon-joined feature flags sent to the X/Twitter syndication endpoint. Override **only** if X changes the flags it requires; the pinned default lives in `src/adapters/twitter.ts`. |
 | `REDDIT_CLIENT_ID` | *(empty)* | Reddit app client ID (optional). When set together with the secret, the Reddit adapter authenticates via OAuth (`oauth.reddit.com`) instead of anonymous JSON, which many networks IP-block. Register a "script" app at [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps). |
 | `REDDIT_CLIENT_SECRET` | *(empty)* | Reddit app client secret (optional, pairs with `REDDIT_CLIENT_ID`). |
+| `PROXY_SECRET` | *(empty)* | HMAC key that signs `/v/` media-proxy URLs. **Set it to a random string to enable inline video** for TikTok/Threads/Instagram; blank disables the proxy and those platforms degrade to a thumbnail or link. See [Video proxy](#video-proxy). |
+| `PROXY_HOST_ALLOWLIST` | *(pinned)* | Comma-separated CDN hosts the proxy may fetch (suffix match). The proxy is **not** an open proxy — only allowlisted hosts are reachable even with a valid token. Blank uses the built-in default list in `src/lib/config.ts`. |
+| `PROXY_MAX_CONCURRENT` | `32` | Max simultaneous in-flight proxied streams (back-pressure guardrail). |
+| `PROXY_MAX_BYTES` | `104857600` | Max bytes streamed per proxied response (100 MiB); a hostile/huge upstream is cut off. |
+| `PROXY_TIMEOUT_MS` | `10000` | Upstream fetch timeout for the media proxy. |
+| `THREADS_LSD` / `THREADS_DOC_ID` / `THREADS_APP_ID` / `THREADS_FRIENDLY_NAME` | *(pinned)* | Threads public web-client constants. Override **only** if Meta rotates them; the pinned defaults live in `src/adapters/threads.ts`. |
+| `TIKTOK_MOBILE_API_HOST` / `TIKTOK_IID` / `TIKTOK_DEVICE_ID` | *(pinned)* | TikTok public web-client constants. Override **only** if TikTok rotates them; the pinned defaults live in `src/adapters/tiktok.ts`. |
+| `INSTAGRAM_DOC_ID` / `INSTAGRAM_APP_ID` / `INSTAGRAM_FRIENDLY_NAME` | *(pinned)* | Instagram public web-client constants. Override **only** if Meta rotates them; the pinned defaults live in `src/adapters/instagram.ts`. |
+| `INSTAGRAM_PROXY_URL` | *(empty)* | Optional residential-proxy offload prefix. Instagram is usually blocked from datacenter IPs; the target URL is appended (URL-encoded) to this prefix. Blank = direct fetch (which typically hits a login wall from a datacenter). |
 
 ### Redis outages degrade gracefully
 
@@ -226,16 +235,18 @@ and can break the tags crawlers parse. Leave `User-Agent` pass-through on.
 | Bluesky | Available now (M2) | Images, video thumbnail, quotes, external links |
 | Twitch | Available now (M3) | Clips — title, broadcaster, view count, thumbnail, and inline MP4 (needs `TWITCH_CLIENT_ID`/`TWITCH_CLIENT_SECRET`). |
 | Twitter/X | Available now (M3) | Tweets — text, photos, inline MP4 video, quoted-tweet preview, NSFW marker. No credentials required. |
-| Threads, Instagram, TikTok | Planned (M4) | — |
+| TikTok | Available now (M4) | Videos and photo posts — title, author, description, thumbnail, and inline video streamed through the `/v/` proxy (needs `PROXY_SECRET`). Short links (`vm.`/`vt.tiktok.com`) resolve. No credentials required. |
+| Threads | Available now (M4) | Posts — text, images, carousels, and inline video streamed through the `/v/` proxy (needs `PROXY_SECRET`). No credentials required. |
+| Instagram | Available now (M4) | Posts, reels, and carousels **when reachable**. Instagram is often blocked from datacenter IPs and returns a login wall — in that case the embed **degrades to an explanatory link** (by design, not a failure). Set `INSTAGRAM_PROXY_URL` to a residential offload to improve reliability. Inline video needs `PROXY_SECRET`. No credentials required. |
 
 The dummy `example.com` adapter ships in M1 so the full pipeline can be verified
 end-to-end (including against real Discord) without any platform dependency.
-Reddit and Bluesky adapters land in M2, Twitch and Twitter/X in M3; further
-platforms follow in M4.
+Reddit and Bluesky adapters land in M2, Twitch and Twitter/X in M3, and Threads,
+Instagram, and TikTok in M4 (alongside the `/v/` video proxy).
 
 Bluesky video currently embeds as a **thumbnail** rather than an inline player:
 Bluesky serves video as HLS (`.m3u8`), which Discord's `og:video` player won't
-fetch. Direct playback arrives with the M4 video proxy.
+fetch — the `/v/` proxy streams progressive MP4, not HLS.
 
 **Twitch** requires a Twitch app (`TWITCH_CLIENT_ID`/`TWITCH_CLIENT_SECRET`,
 registered at [dev.twitch.tv/console](https://dev.twitch.tv/console)); without
@@ -248,6 +259,34 @@ short-lived, so embeds are re-fetched rather than cached long.
 limitation of that anonymous path, NSFW / age-restricted posts (and deleted or
 withheld ones) can't return media and degrade to a plain text notice instead of a
 full embed.
+
+---
+
+## Video proxy
+
+TikTok, Threads, and Instagram serve their video from CDN URLs that are
+short-lived and locked to the requesting IP/UA — Discord's `og:video` player
+can't fetch them directly. fixem.be solves this with a signed media proxy at
+`/v/`: at render time the raw CDN URL is replaced with an HMAC-signed
+`/v/<token>` URL, and `/v/` streams the bytes back (with `Range` support so the
+player can seek), attaching the per-platform headers the CDN requires.
+
+**Enabling it.** Set `PROXY_SECRET` to a random string (e.g.
+`openssl rand -hex 32`). With it unset, the proxy is off and video degrades to a
+thumbnail or link (a startup log line warns about this). The raw CDN URL is
+**never** exposed in an embed — only the signed `/v/` URL is.
+
+**It is not an open proxy.** Tokens are HMAC-signed by the server and every
+target is checked against `PROXY_HOST_ALLOWLIST` (suffix match), so even a forged
+or replayed token can only ever reach an allowlisted CDN host. `PROXY_MAX_BYTES`
+and `PROXY_MAX_CONCURRENT` cap bandwidth and in-flight streams.
+
+**CRITICAL deployment requirement — do NOT proxy `/v/` through Cloudflare's
+orange cloud.** Cloudflare's Terms of Service §2.8 forbid using the CDN to serve
+a disproportionate amount of non-HTML content (video). Put `/v/` — or a
+dedicated `v.fixem.be` — on a **DNS-only "grey-cloud"** record so video bytes
+flow straight to your origin and bypass Cloudflare entirely. Keep the HTML embed
+paths on the orange cloud if you like, but the media stream must not be.
 
 ---
 

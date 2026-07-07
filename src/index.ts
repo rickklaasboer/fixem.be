@@ -9,6 +9,9 @@ import { createRedditAdapter } from "./adapters/reddit";
 import { createBlueskyAdapter } from "./adapters/bluesky";
 import { createTwitterAdapter } from "./adapters/twitter";
 import { createTwitchAdapter } from "./adapters/twitch";
+import { createThreadsAdapter } from "./adapters/threads";
+import { createTiktokAdapter } from "./adapters/tiktok";
+import { createInstagramAdapter } from "./adapters/instagram";
 import { createDummyAdapter } from "./adapters/dummy";
 
 const config = loadConfig();
@@ -23,6 +26,12 @@ const adapters = [
   ),
   createBlueskyAdapter(),
   createTwitterAdapter(fetch, config.twitterSyndicationFeatures),
+  // Anonymous adapters — always registered, no credentials gate. Inline video
+  // (TikTok/Threads/Instagram) requires PROXY_SECRET (warned below); without it
+  // media degrades to a thumbnail or link.
+  createThreadsAdapter(fetch, config.threads),
+  createTiktokAdapter(fetch, config.tiktok),
+  createInstagramAdapter(fetch, config.instagram),
   createDummyAdapter(),
 ];
 if (config.twitchClientId && config.twitchClientSecret) {
@@ -37,6 +46,12 @@ if (config.twitchClientId && config.twitchClientSecret) {
   );
 } else {
   logger.warn({}, "twitch adapter disabled: TWITCH_CLIENT_ID/SECRET not set");
+}
+if (!config.proxySecret) {
+  logger.warn(
+    {},
+    "PROXY_SECRET not set: inline video (TikTok/Threads/Instagram) disabled — media degrades to thumbnail or link",
+  );
 }
 const registry = new AdapterRegistry(adapters);
 const resolver = new Resolver({

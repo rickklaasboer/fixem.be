@@ -118,7 +118,10 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch): PlatformAdapter {
 
       const selftext = (post.selftext ?? "").trim();
       const descParts: string[] = [];
-      if (media.galleryCount) descParts.push(`Gallery • ${media.galleryCount} images`);
+      if (media.galleryCount) {
+        const n = media.galleryCount;
+        descParts.push(`Gallery • ${n} image${n === 1 ? "" : "s"}`);
+      }
       if (selftext) descParts.push(truncate(selftext, 300));
       const description = descParts.length ? descParts.join(" — ") : undefined;
 

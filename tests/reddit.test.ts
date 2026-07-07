@@ -67,6 +67,16 @@ describe("reddit adapter", () => {
     expect(m.description).toBe("Gallery • 3 images — Three days in Lisbon.");
   });
 
+  test("single-item gallery uses singular grammar", async () => {
+    const single = structuredClone(galleryPost) as {
+      gallery_data: { items: { media_id: string }[] };
+    };
+    single.gallery_data.items = single.gallery_data.items.slice(0, 1);
+    const ad = createRedditAdapter(fetchReturning(envelope(single)));
+    const m = await ad.resolve(new URL("https://www.reddit.com/r/travel/comments/ghi789/x/"));
+    expect(m.description).toContain("Gallery • 1 image —");
+  });
+
   test("crosspost inherits parent media and keeps own nsfw flag", async () => {
     const ad = createRedditAdapter(fetchReturning(envelope(crosspost)));
     const m = await ad.resolve(new URL("https://www.reddit.com/r/videos/comments/jkl012/x/"));

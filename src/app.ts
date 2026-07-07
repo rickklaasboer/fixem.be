@@ -71,6 +71,10 @@ export function buildApp(deps: AppDeps): Hono {
 
     if (!crawler && !preview) {
       const canonical = resolver.canonicalFor(parsed.url);
+      logger.info(
+        { platform: canonical?.platform ?? "none", outcome: "redirect", uaClass: "browser" },
+        "redirected",
+      );
       return c.redirect(canonical?.canonicalUrl ?? parsed.url.href, 302);
     }
 
@@ -90,7 +94,11 @@ export function buildApp(deps: AppDeps): Hono {
     );
     // Don't let CDNs pin a transient failure for the full crawler TTL.
     c.header("Cache-Control", outcome.status === "ok" ? "public, max-age=300" : "no-store");
-    return c.html(renderMetaHtml(meta, { oembedUrl: oembedUrlFor(outcome.canonicalUrl) }));
+    // Preview exists to inspect the HTML in a browser (README), so it must
+    // not instantly meta-refresh away.
+    return c.html(
+      renderMetaHtml(meta, { oembedUrl: oembedUrlFor(outcome.canonicalUrl), refresh: !preview }),
+    );
   });
 
   app.onError((err, c) => {

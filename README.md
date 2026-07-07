@@ -192,6 +192,9 @@ Run the container (or `bun src/index.ts`) behind a reverse proxy that terminates
 TLS and forwards to the app on `127.0.0.1:3000`. Compose already binds the app to
 loopback for exactly this topology.
 
+Compose caps Valkey at 256 MB with `allkeys-lru` eviction, because cache keys
+derive from attacker-influenceable URLs and must not grow unbounded.
+
 **Forward client IPs.** Rate limiting keys the client IP off, in order:
 `CF-Connecting-IP` → the **first** entry of `X-Forwarded-For` → the literal
 `"unknown"`. If the service is deployed **without** a proxy that sets one of

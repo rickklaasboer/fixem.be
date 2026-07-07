@@ -14,6 +14,7 @@ services:
   redis:
     image: valkey/valkey:8-alpine
     restart: unless-stopped
+    command: ["valkey-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
       - redis-data:/data
 volumes:

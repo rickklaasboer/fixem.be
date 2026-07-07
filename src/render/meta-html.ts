@@ -24,8 +24,9 @@ export function minimalMeta(canonicalUrl: string): EmbedMetadata {
 
 export function renderMetaHtml(
   meta: EmbedMetadata,
-  opts: { oembedUrl: string },
+  opts: { oembedUrl: string; refresh?: boolean },
 ): string {
+  const refresh = opts.refresh ?? true;
   const title = `${meta.nsfw ? "🔞 " : ""}${meta.title}`;
   const lines: string[] = [
     tag("property", "og:title", title),
@@ -78,8 +79,7 @@ export function renderMetaHtml(
 <title>${esc(title)}</title>
 ${lines.join("\n")}
 <link rel="alternate" type="application/json+oembed" href="${esc(opts.oembedUrl)}" title="${esc(meta.author?.name ?? meta.siteName)}">
-<meta http-equiv="refresh" content="0;url=${esc(meta.originalUrl)}">
-</head>
+${refresh ? `<meta http-equiv="refresh" content="0;url=${esc(meta.originalUrl)}">\n` : ""}</head>
 <body>
 <p>Redirecting to <a href="${esc(meta.originalUrl)}">${esc(meta.originalUrl)}</a></p>
 </body>

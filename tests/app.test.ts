@@ -65,10 +65,19 @@ describe("routes", () => {
     expect(res.headers.get("Location")).toBe("https://example.com/hello");
   });
 
-  test("browser with fixem=preview gets meta-HTML", async () => {
+  test("browser with fixem=preview gets meta-HTML without meta refresh", async () => {
     const res = await get(makeApp(), "/https://example.com/hello?fixem=preview", BROWSER_UA);
     expect(res.status).toBe(200);
-    expect(await res.text()).toContain("og:title");
+    const html = await res.text();
+    expect(html).toContain("og:title");
+    // Preview is for inspecting the HTML in a browser; it must not
+    // instantly navigate away.
+    expect(html).not.toContain('http-equiv="refresh"');
+  });
+
+  test("crawler meta-HTML keeps the meta refresh", async () => {
+    const res = await get(makeApp(), "/https://example.com/hello", DISCORD_UA);
+    expect(await res.text()).toContain('http-equiv="refresh"');
   });
 
   test("unmatched valid URL redirects for both crawler and browser", async () => {

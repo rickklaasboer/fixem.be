@@ -1,0 +1,19 @@
+{
+  "thread": {
+    "$type": "app.bsky.feed.defs#threadViewPost",
+    "post": {
+      "uri": "at://did:plc:abc123xyz/app.bsky.feed.post/3kext",
+      "author": { "did": "did:plc:abc123xyz", "handle": "erin.bsky.social", "displayName": "Erin" },
+      "record": { "$type": "app.bsky.feed.post", "text": "Good read.", "createdAt": "2026-07-04T10:00:00Z" },
+      "embed": {
+        "$type": "app.bsky.embed.external#view",
+        "external": {
+          "uri": "https://example.org/article",
+          "title": "How embeds work",
+          "description": "A deep dive.",
+          "thumb": "https://cdn.bsky.app/img/feed_thumbnail/plain/ext@jpeg"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "thread": {
+    "$type": "app.bsky.feed.defs#threadViewPost",
+    "post": {
+      "uri": "at://did:plc:abc123xyz/app.bsky.feed.post/3kquo",
+      "author": { "did": "did:plc:abc123xyz", "handle": "carol.bsky.social", "displayName": "Carol" },
+      "record": { "$type": "app.bsky.feed.post", "text": "This is important:", "createdAt": "2026-07-03T10:00:00Z" },
+      "embed": {
+        "$type": "app.bsky.embed.record#view",
+        "record": {
+          "$type": "app.bsky.embed.record#viewRecord",
+          "author": { "did": "did:plc:other", "handle": "dave.bsky.social", "displayName": "Dave" },
+          "value": { "$type": "app.bsky.feed.post", "text": "Original insight about embeds." }
+        }
+      }
+    }
+  }
+}

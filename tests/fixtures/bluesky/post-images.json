@@ -1,0 +1,17 @@
+{
+  "thread": {
+    "$type": "app.bsky.feed.defs#threadViewPost",
+    "post": {
+      "uri": "at://did:plc:abc123xyz/app.bsky.feed.post/3kabc",
+      "author": { "did": "did:plc:abc123xyz", "handle": "alice.bsky.social", "displayName": "Alice" },
+      "record": { "$type": "app.bsky.feed.post", "text": "Two cats, one box.", "createdAt": "2026-07-01T10:00:00Z" },
+      "embed": {
+        "$type": "app.bsky.embed.images#view",
+        "images": [
+          { "fullsize": "https://cdn.bsky.app/img/feed_fullsize/plain/cat1@jpeg", "thumb": "https://cdn.bsky.app/img/feed_thumbnail/plain/cat1@jpeg", "alt": "", "aspectRatio": { "width": 2000, "height": 1500 } },
+          { "fullsize": "https://cdn.bsky.app/img/feed_fullsize/plain/cat2@jpeg", "thumb": "https://cdn.bsky.app/img/feed_thumbnail/plain/cat2@jpeg", "alt": "", "aspectRatio": { "width": 2000, "height": 1500 } }
+        ]
+      }
+    }
+  }
+}

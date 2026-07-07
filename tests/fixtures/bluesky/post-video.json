@@ -1,0 +1,16 @@
+{
+  "thread": {
+    "$type": "app.bsky.feed.defs#threadViewPost",
+    "post": {
+      "uri": "at://did:plc:abc123xyz/app.bsky.feed.post/3kvid",
+      "author": { "did": "did:plc:abc123xyz", "handle": "bob.bsky.social", "displayName": "Bob" },
+      "record": { "$type": "app.bsky.feed.post", "text": "Sunset timelapse", "createdAt": "2026-07-02T10:00:00Z" },
+      "embed": {
+        "$type": "app.bsky.embed.video#view",
+        "playlist": "https://video.bsky.app/watch/did/xyz/playlist.m3u8",
+        "thumbnail": "https://video.bsky.app/watch/did/xyz/thumbnail.jpg",
+        "aspectRatio": { "width": 1280, "height": 720 }
+      }
+    }
+  }
+}

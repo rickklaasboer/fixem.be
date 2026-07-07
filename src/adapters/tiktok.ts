@@ -73,6 +73,8 @@ export function createTiktokAdapter(
     const start = html.indexOf(marker);
     if (start < 0) throw new Error("tiktok: rehydration data not found");
     const from = start + marker.length;
+    // Safe because TikTok escapes `<` as < inside the JSON payload, so the
+    // next literal </script> is always the script's real end tag.
     const end = html.indexOf("</script>", from);
     if (end < 0) throw new Error("tiktok: rehydration data truncated");
     const scope = JSON.parse(html.slice(from, end)) as {

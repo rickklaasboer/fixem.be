@@ -60,11 +60,8 @@ export class Resolver {
     const canonicalUrl = adapter.canonicalize(url);
     const platform = adapter.name;
 
-    const breaker = this.failures.get(platform);
-    if (breaker && breaker.openUntil > this.now()) {
-      return { status: "degraded", canonicalUrl, platform, reason: "breaker-open" };
-    }
-
+    // Cache first, breaker second: a fresh cached embed needs no adapter
+    // call, so an open breaker must not degrade it.
     const key = `meta:${canonicalUrl}`;
     const cached = await this.opts.cache.get(key);
     if (cached !== null) {
@@ -74,6 +71,11 @@ export class Resolver {
       } catch {
         // corrupt cache entry — fall through to a fresh resolve
       }
+    }
+
+    const breaker = this.failures.get(platform);
+    if (breaker && breaker.openUntil > this.now()) {
+      return { status: "degraded", canonicalUrl, platform, reason: "breaker-open" };
     }
 
     const existing = this.inflight.get(key);

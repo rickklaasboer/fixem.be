@@ -109,4 +109,25 @@ describe("Resolver", () => {
     await r.resolve(new URL("https://fake.test/p"));
     expect(calls).toBe(3);
   });
+
+  test("cached entries are served even while breaker is open", async () => {
+    let fail = false;
+    const { adapter } = fakeAdapter({
+      resolve: async () => {
+        if (fail) throw new Error("boom");
+        return META;
+      },
+    });
+    const r = makeResolver(adapter, { breakerThreshold: 2 });
+    await r.resolve(new URL("https://fake.test/p")); // now cached
+    fail = true;
+    await r.resolve(new URL("https://fake.test/q"));
+    await r.resolve(new URL("https://fake.test/q")); // breaker opens
+    const hit = await r.resolve(new URL("https://fake.test/p"));
+    expect(hit.status).toBe("ok");
+    if (hit.status === "ok") expect(hit.cacheHit).toBe(true);
+    const miss = await r.resolve(new URL("https://fake.test/q"));
+    expect(miss.status).toBe("degraded");
+    if (miss.status === "degraded") expect(miss.reason).toBe("breaker-open");
+  });
 });

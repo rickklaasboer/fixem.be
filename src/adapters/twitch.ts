@@ -1,9 +1,9 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
+import { PLATFORM_UA } from "../lib/http";
 
 const HOSTS = new Set(["clips.twitch.tv", "twitch.tv", "www.twitch.tv", "m.twitch.tv"]);
 const SLUG_RE = /^[A-Za-z0-9_-]+$/;
 const CHANNEL_CLIP_RE = /^\/[^/]+\/clip\/([A-Za-z0-9_-]+)\/?$/;
-const UA = "fixem.be/1.0 (embed fixer; +https://fixem.be)";
 
 export interface TwitchGqlConfig {
   clientId: string;
@@ -43,7 +43,7 @@ export function createTwitchAdapter(
     if (token && Date.now() < token.expiresAt - 60_000) return token.value;
     const res = await fetchFn("https://id.twitch.tv/oauth2/token", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": UA },
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": PLATFORM_UA },
       body: `client_id=${creds.clientId}&client_secret=${creds.clientSecret}&grant_type=client_credentials`,
     });
     if (!res.ok) throw new Error(`twitch token ${res.status}`);
@@ -58,7 +58,7 @@ export function createTwitchAdapter(
       headers: {
         Authorization: `Bearer ${await appToken()}`,
         "Client-Id": creds.clientId,
-        "User-Agent": UA,
+        "User-Agent": PLATFORM_UA,
       },
     });
     if (res.status === 401 && !retried) {
@@ -78,7 +78,7 @@ export function createTwitchAdapter(
     try {
       const res = await fetchFn("https://gql.twitch.tv/gql", {
         method: "POST",
-        headers: { "Client-ID": gql.clientId, "Content-Type": "application/json", "User-Agent": UA },
+        headers: { "Client-ID": gql.clientId, "Content-Type": "application/json", "User-Agent": PLATFORM_UA },
         body: JSON.stringify({
           operationName: "VideoAccessToken_Clip",
           variables: { slug },

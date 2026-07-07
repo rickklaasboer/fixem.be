@@ -1,5 +1,6 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
 import { truncate } from "../lib/text";
+import { PLATFORM_UA } from "../lib/http";
 
 const API = "https://public.api.bsky.app/xrpc";
 const PATH_RE = /^\/profile\/([^/]+)\/post\/([^/]+)\/?$/;
@@ -33,7 +34,7 @@ interface BskyThreadResponse {
 
 async function getJson<T>(fetchFn: FetchFn, url: string): Promise<T> {
   const res = await fetchFn(url, {
-    headers: { "User-Agent": "fixem.be/1.0 (embed fixer; +https://fixem.be)" },
+    headers: { "User-Agent": PLATFORM_UA },
   });
   if (!res.ok) throw new Error(`bluesky ${res.status}`);
   return (await res.json()) as T;

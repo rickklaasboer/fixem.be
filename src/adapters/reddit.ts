@@ -1,5 +1,6 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
 import { truncate } from "../lib/text";
+import { PLATFORM_UA } from "../lib/http";
 
 const HOSTS = new Set([
   "reddit.com",
@@ -13,8 +14,6 @@ const HOSTS = new Set([
 
 // Mobile share links (/r/<sub>/s/<token>) redirect to the real permalink.
 const SHARE_RE = /^\/r\/[^/]+\/s\/[^/]+\/?$/;
-
-const USER_AGENT = "fixem.be/1.0 (embed fixer; +https://fixem.be)";
 
 const TOKEN_URL = "https://www.reddit.com/api/v1/access_token";
 // Refresh when the cached token is within this margin of expiry.
@@ -36,7 +35,7 @@ function createTokenManager(fetchFn: FetchFn, creds: RedditCreds): () => Promise
       headers: {
         Authorization: `Basic ${btoa(`${creds.clientId}:${creds.clientSecret}`)}`,
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": USER_AGENT,
+        "User-Agent": PLATFORM_UA,
       },
       body: "grant_type=client_credentials",
     });
@@ -117,7 +116,7 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch, creds?: RedditCred
         // The .json endpoint 307s share links to a non-JSON target, so follow
         // the redirect manually and resolve the real permalink instead.
         const redirect = await fetchFn(canonical, {
-          headers: { "User-Agent": USER_AGENT },
+          headers: { "User-Agent": PLATFORM_UA },
           redirect: "manual",
         });
         let target: URL;
@@ -132,10 +131,10 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch, creds?: RedditCred
       // is IP-blocked on many networks. Canonical URLs stay www.reddit.com.
       const res = getToken
         ? await fetchFn(`https://oauth.reddit.com${new URL(canonical).pathname}.json?raw_json=1`, {
-            headers: { Authorization: `bearer ${await getToken()}`, "User-Agent": USER_AGENT },
+            headers: { Authorization: `bearer ${await getToken()}`, "User-Agent": PLATFORM_UA },
           })
         : await fetchFn(`${canonical}.json?raw_json=1`, {
-            headers: { "User-Agent": USER_AGENT },
+            headers: { "User-Agent": PLATFORM_UA },
           });
       if (!res.ok) throw new Error(`reddit ${res.status}`);
       const json = (await res.json()) as [{ data: { children: { data: RedditPost }[] } }, unknown];

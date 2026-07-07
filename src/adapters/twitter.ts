@@ -1,5 +1,6 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
 import { truncate } from "../lib/text";
+import { PLATFORM_UA } from "../lib/http";
 
 const HOSTS = new Set([
   "twitter.com",
@@ -12,7 +13,6 @@ const HOSTS = new Set([
 // (?=\/|$) — a malformed ID like /status/123abc must not match-and-truncate
 // to tweet 123.
 const PATH_RE = /^\/([A-Za-z0-9_]{1,15})\/status(?:es)?\/(\d{1,20})(?=\/|$)/;
-const UA = "fixem.be/1.0 (embed fixer; +https://fixem.be)";
 
 // react-tweet's syndication feature flags — cosmetic but required (research §2a).
 export const SYNDICATION_FEATURES = [
@@ -82,7 +82,7 @@ export function createTwitterAdapter(fetchFn: FetchFn = fetch): PlatformAdapter 
         `https://cdn.syndication.twimg.com/tweet-result?id=${p.id}` +
         `&lang=en&token=${syndicationToken(p.id)}` +
         `&features=${encodeURIComponent(SYNDICATION_FEATURES)}`;
-      const res = await fetchFn(apiUrl, { headers: { "User-Agent": UA } });
+      const res = await fetchFn(apiUrl, { headers: { "User-Agent": PLATFORM_UA } });
       if (!res.ok) throw new Error(`twitter ${res.status}`);
       const j = (await res.json()) as SynTweet;
       if (!j || !j.__typename) throw new Error("twitter: tweet unavailable");

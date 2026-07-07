@@ -128,7 +128,7 @@ and edit as needed; every value has a sane default (see `src/lib/config.ts`).
 | `RESOLVE_TIMEOUT_MS` | `5000` | Per-adapter resolve timeout. A slower upstream degrades to a minimal embed rather than hanging. |
 | `RATE_LIMIT_PER_MIN` | `60` | Max requests per client IP per minute for non-crawler traffic. Crawlers are exempt. |
 | `EXTRA_CRAWLER_UAS` | *(empty)* | Comma-separated extra `User-Agent` substrings (case-insensitive) to treat as crawlers, in addition to the built-in list. |
-| `TWITCH_CLIENT_ID` | *(empty)* | Twitch app client ID. Required to enable Twitch clip embeds; register an app at [dev.twitch.tv/console](https://dev.twitch.tv/console). When it and the secret are unset the Twitch adapter is disabled (logged on startup) and Twitch links fall through. |
+| `TWITCH_CLIENT_ID` | *(empty)* | Twitch app client ID. Required to enable Twitch clip embeds; register an app at [dev.twitch.tv/console](https://dev.twitch.tv/console). The adapter is disabled unless BOTH are set (logged on startup); when disabled, Twitch links fall through. |
 | `TWITCH_CLIENT_SECRET` | *(empty)* | Twitch app client secret (pairs with `TWITCH_CLIENT_ID`). |
 | `TWITCH_GQL_CLIENT_ID` | *(pinned)* | Twitch's public web client ID, used for the clip video (GraphQL) call. Override **only** if Twitch rotates its public web constants; the pinned default lives in `src/adapters/twitch.ts`. |
 | `TWITCH_GQL_CLIP_HASH` | *(pinned)* | Persisted-query hash for the clip playback-access-token GraphQL call. Override **only** if Twitch rotates its public web constants. |

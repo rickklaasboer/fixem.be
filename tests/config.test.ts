@@ -33,6 +33,14 @@ describe("loadConfig", () => {
     expect(c.redditClientSecret).toBe("rsecret");
   });
 
+  test("blank GQL overrides fall back to pinned defaults", () => {
+    // `cp .env.example .env` leaves TWITCH_GQL_* as empty strings — those must
+    // not reach the adapter as a blank Client-ID.
+    const c = loadConfig({ TWITCH_GQL_CLIENT_ID: "", TWITCH_GQL_CLIP_HASH: "" });
+    expect(c.twitchGqlClientId).toBe("kimne78kx3ncx6brgo4mv6wki5h1ko");
+    expect(c.twitchGqlClipHash.length).toBe(64);
+  });
+
   test("falls back to default on non-numeric value", () => {
     expect(loadConfig({ PORT: "banana" }).port).toBe(3000);
   });

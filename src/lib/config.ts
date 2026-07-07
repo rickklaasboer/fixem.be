@@ -45,8 +45,10 @@ export function loadConfig(
       .filter(Boolean),
     twitchClientId: env.TWITCH_CLIENT_ID,
     twitchClientSecret: env.TWITCH_CLIENT_SECRET,
-    twitchGqlClientId: env.TWITCH_GQL_CLIENT_ID ?? TWITCH_GQL_DEFAULTS.clientId,
-    twitchGqlClipHash: env.TWITCH_GQL_CLIP_HASH ?? TWITCH_GQL_DEFAULTS.clipTokenHash,
+    // `||` (not `??`): a copied .env.example leaves these as "", which must
+    // still fall back to the pinned defaults.
+    twitchGqlClientId: env.TWITCH_GQL_CLIENT_ID || TWITCH_GQL_DEFAULTS.clientId,
+    twitchGqlClipHash: env.TWITCH_GQL_CLIP_HASH || TWITCH_GQL_DEFAULTS.clipTokenHash,
     redditClientId: env.REDDIT_CLIENT_ID,
     redditClientSecret: env.REDDIT_CLIENT_SECRET,
   };

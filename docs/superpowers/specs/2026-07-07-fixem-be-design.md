@@ -24,7 +24,7 @@ Supported platforms (build order): Reddit, Bluesky, Twitch Clips, Twitter/X, Thr
 ### Target URL parsing (catch-all)
 
 1. Strip leading `/`; accept `https://…`, `http://…`, and bare `www.host/…` (default https).
-2. Accept URL-encoded paths; decode once, reject double-encoded input.
+2. Accept URL-encoded paths; decode once, reject *structurally* double-encoded input (scheme colon or slash still percent-encoded after one decode). Deeper double-encoding of ordinary characters passes through — it may be a legitimate literal %-sequence in the target URL — and the WHATWG host parser rejects stray `%` in hostnames.
 3. Validate scheme is http(s) and hostname matches a registered adapter **before any network fetch**. This doubles as the SSRF guard: only adapter-claimed hosts are ever fetched.
 4. No adapter match → `302` to the URL if it is a valid public http(s) URL, else `400` with a short plain-text usage hint.
 

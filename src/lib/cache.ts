@@ -6,6 +6,9 @@ export interface MetadataCache {
   ping(): Promise<boolean>;
 }
 
+// Test/dev backend: evicts lazily on read only and has no size bound, so it
+// is not suitable for production traffic — production wiring uses
+// createRedisCache (src/index.ts), and Redis owns expiry there.
 export class MemoryCache implements MetadataCache {
   private store = new Map<string, { value: string; expiresAt: number }>();
 

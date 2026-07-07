@@ -13,4 +13,8 @@ describe("truncate", () => {
   test("unbreakable strings hard-cut", () => {
     expect(truncate("abcdefghij", 5)).toBe("abcd…");
   });
+  test("non-positive max returns empty string", () => {
+    expect(truncate("aaaaaaaaaa", 0)).toBe("");
+    expect(truncate("aaaaaaaaaa", -3)).toBe("");
+  });
 });

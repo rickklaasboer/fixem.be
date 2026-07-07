@@ -78,7 +78,7 @@ describe("twitter adapter", () => {
     const m = await ad.resolve(TWEET_URL);
     expect(m.kind).toBe("link");
     expect(m.title).toBe("@janedoe");
-    expect(m.nsfw).toBe(true);
+    expect(m.nsfw).toBe(false);
     expect(m.ttlSeconds).toBe(600);
     expect(m.description).toContain("unavailable");
   });

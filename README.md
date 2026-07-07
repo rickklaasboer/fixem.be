@@ -241,7 +241,8 @@ fetch. Direct playback arrives with the M4 video proxy.
 registered at [dev.twitch.tv/console](https://dev.twitch.tv/console)); without
 them the adapter is disabled at startup and Twitch links fall through. Clip video
 is served through a short-lived **signed CDN URL**, so a resolved clip is cached
-for only ~30 minutes (the signature's lifetime) rather than the default 4 hours.
+for only ~30 minutes rather than the default 4 hours — the signed URL is
+short-lived, so embeds are re-fetched rather than cached long.
 
 **Twitter/X** needs no credentials — it reads the anonymous syndication API. As a
 limitation of that anonymous path, NSFW / age-restricted posts (and deleted or

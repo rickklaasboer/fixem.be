@@ -3,6 +3,7 @@ import { PLATFORM_UA } from "../lib/http";
 
 const HOSTS = new Set(["clips.twitch.tv", "twitch.tv", "www.twitch.tv", "m.twitch.tv"]);
 const SLUG_RE = /^[A-Za-z0-9_-]+$/;
+const CLIPS_HOST_RE = /^\/([A-Za-z0-9_-]+)\/?$/;
 const CHANNEL_CLIP_RE = /^\/[^/]+\/clip\/([A-Za-z0-9_-]+)\/?$/;
 
 export interface TwitchGqlConfig {
@@ -25,8 +26,15 @@ interface HelixClip {
 
 function slugFrom(url: URL): string | null {
   if (url.hostname === "clips.twitch.tv") {
-    const s = url.pathname.split("/")[1] ?? "";
-    return SLUG_RE.test(s) ? s : null;
+    // The iframe/share form is /embed?clip=<slug>; read the slug from the query.
+    if (url.pathname === "/embed" || url.pathname === "/embed/") {
+      const clip = url.searchParams.get("clip");
+      return clip && SLUG_RE.test(clip) ? clip : null;
+    }
+    // Otherwise exactly /<slug> — reject multi-segment paths that would
+    // false-match and then fail Helix (counting against the circuit breaker).
+    const m = url.pathname.match(CLIPS_HOST_RE);
+    return m ? m[1]! : null;
   }
   const m = url.pathname.match(CHANNEL_CLIP_RE);
   return m ? m[1]! : null;
@@ -44,7 +52,11 @@ export function createTwitchAdapter(
     const res = await fetchFn("https://id.twitch.tv/oauth2/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": PLATFORM_UA },
-      body: `client_id=${creds.clientId}&client_secret=${creds.clientSecret}&grant_type=client_credentials`,
+      body: new URLSearchParams({
+        client_id: creds.clientId,
+        client_secret: creds.clientSecret,
+        grant_type: "client_credentials",
+      }).toString(),
     });
     if (!res.ok) throw new Error(`twitch token ${res.status}`);
     const j = (await res.json()) as { access_token?: string; expires_in?: number };
@@ -130,7 +142,7 @@ export function createTwitchAdapter(
         description: clip.view_count !== undefined ? `${clip.view_count} views` : undefined,
         author: {
           name: clip.broadcaster_name,
-          url: `https://www.twitch.tv/${clip.broadcaster_name}`,
+          url: `https://www.twitch.tv/${encodeURIComponent(clip.broadcaster_name)}`,
         },
         siteName: "Twitch",
         themeColor: "#9146FF",

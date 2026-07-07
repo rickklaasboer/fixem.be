@@ -42,6 +42,11 @@ describe("twitch adapter", () => {
     expect(a.match(new URL("https://m.twitch.tv/streamer_jane/clip/Slug-123_x"))).toBe(true);
     expect(a.match(new URL("https://www.twitch.tv/streamer_jane"))).toBe(false);
     expect(a.match(new URL("https://twitch.example/x/clip/y"))).toBe(false);
+    expect(a.match(new URL("https://clips.twitch.tv/SomeSlug/extra"))).toBe(false);
+    expect(a.match(new URL("https://clips.twitch.tv/embed?clip=SomeSlug"))).toBe(true);
+    expect(a.canonicalize(new URL("https://clips.twitch.tv/embed?clip=SomeSlug"))).toBe(
+      "https://clips.twitch.tv/SomeSlug",
+    );
   });
 
   test("canonicalize maps to clips.twitch.tv", () => {

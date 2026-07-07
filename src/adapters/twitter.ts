@@ -100,7 +100,7 @@ export function createTwitterAdapter(
             "This post is unavailable via Twitter's public API (deleted, withheld, or age-restricted).",
           siteName: "X (Twitter)",
           themeColor: "#000000",
-          nsfw: true,
+          nsfw: false,
           ttlSeconds: 600,
           originalUrl: canonical,
         };

@@ -30,9 +30,12 @@ export interface ThreadsConfig {
 
 export const THREADS_DEFAULTS: ThreadsConfig = {
   lsd: "XudMkvWGqcnLxbgeR25f3V",
-  docId: "6821609764538244",
+  // Refreshed 2026-07: the post query was renamed BarcelonaPostPageQuery →
+  // BarcelonaPostPageDirectQuery (doc_id changed to match). Verify/refresh from
+  // the Threads web bundles when Meta rotates these.
+  docId: "36633640579617733",
   appId: "238260118697367",
-  friendlyName: "BarcelonaPostPageQuery",
+  friendlyName: "BarcelonaPostPageDirectQuery",
 };
 
 interface ThreadsMediaNode {
@@ -162,7 +165,15 @@ export function createThreadsAdapter(
       }).toString(),
     });
     if (!res.ok) throw new Error(`threads graphql ${res.status}`);
-    const json = (await res.json()) as GraphqlResponse;
+    // Meta bot-blocks anonymous GraphQL from many IPs by returning an HTML
+    // challenge page (200, text/html) instead of JSON. Treat that as "couldn't
+    // load" → the informative degrade embed, not a hard throw.
+    let json: GraphqlResponse;
+    try {
+      json = (await res.json()) as GraphqlResponse;
+    } catch {
+      return undefined;
+    }
     const items = json.data?.data?.containing_thread?.thread_items ?? [];
     // Take the last item that actually carries a post (replies/tombstones drop in).
     for (let i = items.length - 1; i >= 0; i--) {

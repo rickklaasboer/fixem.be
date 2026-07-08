@@ -206,6 +206,27 @@ describe("threads adapter", () => {
     expect(m.originalUrl).toBe("https://www.threads.com/@johndoe/post/ABC123");
   });
 
+  test("GraphQL HTML challenge (Meta bot-block) -> informative link embed (no throw)", async () => {
+    // Meta returns a 200 text/html challenge page instead of JSON when it blocks
+    // the anonymous GraphQL call — must degrade to the informative embed, not throw
+    // (throwing would give a bare URL-as-title redirect).
+    const htmlChallenge = (async (input: unknown) => {
+      if (String(input).includes("bulk-route-definitions")) {
+        return new Response(`for (;;);${JSON.stringify(routeFixture)}`);
+      }
+      return new Response("<!DOCTYPE html><html>login</html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      });
+    }) as unknown as FetchFn;
+    const ad = createThreadsAdapter(htmlChallenge);
+    const m = await ad.resolve(POST_URL);
+    expect(m.kind).toBe("link");
+    expect(m.title).toBe("@johndoe");
+    expect(m.description).toContain("couldn't be loaded");
+    expect(m.originalUrl).toBe("https://www.threads.com/@johndoe/post/ABC123");
+  });
+
   test("missing post_id from route call throws", async () => {
     const ad = createThreadsAdapter(fakeFetch({ route: { payload: { payloads: {} } } }));
     await expect(ad.resolve(POST_URL)).rejects.toThrow(/post_id/);

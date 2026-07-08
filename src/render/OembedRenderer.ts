@@ -10,7 +10,7 @@ import type EmbedMetadata from '@/domain/EmbedMetadata';
  */
 @singleton()
 export default class OembedRenderer {
-    render(
+    public render(
         meta: EmbedMetadata,
         publicBaseUrl: string,
     ): Record<string, unknown> {

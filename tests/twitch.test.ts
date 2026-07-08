@@ -1,7 +1,7 @@
 import {describe, expect, test} from 'bun:test';
-import TwitchAdapter from '../src/adapters/TwitchAdapter';
-import Config from '../src/config/Config';
-import HttpClient from '../src/services/HttpClient';
+import TwitchAdapter from '@/adapters/TwitchAdapter';
+import Config from '@/config/Config';
+import HttpClient from '@/services/HttpClient';
 import type {FetchFn} from '@/services/HttpClient';
 import helixClip from './fixtures/twitch/helix-clip.json';
 import gqlClip from './fixtures/twitch/gql-clip.json';

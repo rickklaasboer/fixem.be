@@ -1,7 +1,7 @@
 import {describe, expect, test} from 'bun:test';
-import RedditAdapter from '../src/adapters/RedditAdapter';
-import Config from '../src/config/Config';
-import HttpClient from '../src/services/HttpClient';
+import RedditAdapter from '@/adapters/RedditAdapter';
+import Config from '@/config/Config';
+import HttpClient from '@/services/HttpClient';
 import type {FetchFn} from '@/services/HttpClient';
 import {CHROME_UA} from '@/services/HttpClient';
 import imagePost from './fixtures/reddit/image-post.json';

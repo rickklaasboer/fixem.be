@@ -1,8 +1,8 @@
 import {describe, expect, test} from 'bun:test';
-import ThreadsAdapter from '../src/adapters/ThreadsAdapter';
-import {THREADS_DEFAULTS} from '../src/config/defaults';
-import Config from '../src/config/Config';
-import HttpClient, {FIREFOX_UA} from '../src/services/HttpClient';
+import ThreadsAdapter from '@/adapters/ThreadsAdapter';
+import {THREADS_DEFAULTS} from '@/config/defaults';
+import Config from '@/config/Config';
+import HttpClient, {FIREFOX_UA} from '@/services/HttpClient';
 import type {FetchFn} from '@/services/HttpClient';
 import routeFixture from './fixtures/threads/route.json';
 import postImage from './fixtures/threads/post-image.json';

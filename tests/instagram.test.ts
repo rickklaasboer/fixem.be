@@ -1,9 +1,9 @@
 import {describe, expect, test} from 'bun:test';
-import InstagramAdapter from '../src/adapters/InstagramAdapter';
-import {INSTAGRAM_DEFAULTS, type InstagramConfig} from '../src/config/defaults';
-import Config from '../src/config/Config';
-import HttpClient, {CHROME_UA} from '../src/services/HttpClient';
-import Snapsave from '../src/services/Snapsave';
+import InstagramAdapter from '@/adapters/InstagramAdapter';
+import {INSTAGRAM_DEFAULTS, type InstagramConfig} from '@/config/defaults';
+import Config from '@/config/Config';
+import HttpClient, {CHROME_UA} from '@/services/HttpClient';
+import Snapsave from '@/services/Snapsave';
 import type {FetchFn} from '@/services/HttpClient';
 import imageFixture from './fixtures/instagram/graphql-image.json';
 import videoFixture from './fixtures/instagram/graphql-video.json';

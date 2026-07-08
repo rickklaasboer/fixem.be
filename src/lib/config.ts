@@ -29,6 +29,8 @@ export interface Config {
     threads: ThreadsConfig;
     tiktok: TiktokConfig;
     instagram: InstagramConfig;
+    // Auth for the /api/* surface (e.g. /api/status/adapter). Empty = /api closed.
+    statusApiKey: string;
 }
 
 export const DEFAULT_PROXY_ALLOWLIST = [
@@ -134,5 +136,8 @@ export function loadConfig(
             // Opt-in snapsave.app fallback when our own fetch is login-walled.
             snapsave: env.INSTAGRAM_SNAPSAVE === 'true',
         },
+        // Bearer secret for the /api/* surface. Unset/blank keeps /api closed
+        // (404) so the status endpoint is never open unauthenticated.
+        statusApiKey: env.STATUS_API_KEY ?? '',
     };
 }

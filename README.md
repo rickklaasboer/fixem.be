@@ -275,12 +275,21 @@ sidecar (`gatus` service) that watches the deployment:
 
 - **Liveness** (every minute): `GET /healthz` (app + Redis) and the full public
   path `https://fixem.be/healthz` (also checks the TLS cert isn't near expiry).
-- **Adapters** (every 4 hours): one real resolve per platform through the
-  `/preview/` hatch. The 4h interval matches `CACHE_TTL_SECONDS` so each run is a
-  genuine upstream re-fetch rather than a cached re-validation. A check passes
-  when the adapter still produces real media; if a platform changes and the embed
-  degrades to a link, the check goes red. Threads is checked for a live code path
-  only, since it degrades by design from a datacenter IP.
+- **Adapters** (every 4 hours): one real resolve per platform via the JSON
+  endpoint `GET /api/status/adapter?url=<post>`, which returns
+  `{platform, status, kind, hasMedia, …}`. Gatus asserts on it with JSONPath
+  (`[BODY].hasMedia == true`); its glob `pattern()` can't match a multi-line HTML
+  body, so this endpoint exists instead of scraping `/preview/`. The 4h interval
+  matches `CACHE_TTL_SECONDS` so each run is a genuine upstream re-fetch rather
+  than a cached re-validation. If a platform changes and the embed degrades to a
+  link, `hasMedia` flips to false and the check goes red. Threads is checked for a
+  live code path only (`[BODY].platform == threads`), since it degrades by design
+  from a datacenter IP.
+
+The `/api/*` surface is **authenticated**: set `STATUS_API_KEY` in `.env` to a
+random secret (`openssl rand -hex 32`) — the app requires it as an `X-Api-Key`
+header, and Gatus sends it. With `STATUS_API_KEY` blank the whole `/api/*`
+namespace returns 404, so the status endpoint is never open unauthenticated.
 
 Set `GATUS_DISCORD_WEBHOOK_URL` in `.env` to get Discord alerts on
 failure/recovery (blank = dashboard only). The dashboard binds to
@@ -292,8 +301,9 @@ public posts. Because upstream posts can be deleted, verify each is green after
 first deploy and swap any that aren't:
 
 ```bash
-# On the VPS, from the compose directory — confirm each adapter returns media
-# (or, for threads, a live code path) BEFORE relying on alerts:
+# On the VPS, from the compose directory — confirm each adapter has media
+# (or, for threads, a live code path) BEFORE relying on alerts. Uses $STATUS_API_KEY
+# from the environment (e.g. `set -a; . ./.env; set +a`).
 for u in \
   "https://www.reddit.com/r/pics/comments/haucpf/ive_found_a_few_funny_memories_during_lockdown/" \
   "https://bsky.app/profile/bsky.app/post/3m5yqc2is5s2q" \
@@ -301,7 +311,9 @@ for u in \
   "https://www.instagram.com/p/BsOGulcndj-/" \
   "https://www.tiktok.com/@zachking/video/7095025543627705643" ; do
   printf '%s -> ' "$u"
-  curl -s "http://127.0.0.1:3000/preview/$u" | grep -q 'class="media"' && echo OK || echo "NO MEDIA — swap"
+  curl -s -H "X-Api-Key: $STATUS_API_KEY" \
+    "http://127.0.0.1:3000/api/status/adapter?url=$u"
+  echo
 done
 ```
 

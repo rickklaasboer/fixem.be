@@ -1,5 +1,5 @@
 import {describe, expect, test} from 'bun:test';
-import {AdapterRegistry} from '../src/adapters/registry';
+import AdapterRegistry from '@/domain/AdapterRegistry';
 import {createDummyAdapter} from '../src/adapters/dummy';
 
 describe('registry + dummy adapter', () => {

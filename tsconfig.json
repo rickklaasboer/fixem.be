@@ -6,6 +6,9 @@
         "strict": true,
         "noUncheckedIndexedAccess": true,
         "noEmit": true,
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "paths": {"@/*": ["./src/*"]},
         "types": ["bun"],
         "skipLibCheck": true
     },

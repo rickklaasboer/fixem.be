@@ -38,7 +38,7 @@ Layered, single Hono app. Data flows one direction:
 
 ## Conventions (follow these)
 
-- **Runtime deps: `hono` only.** No other npm runtime packages. Redis is Bun's built-in `RedisClient`; crypto is Web Crypto.
+- **Runtime deps: `hono`, `tsyringe`, `reflect-metadata` only.** No other npm runtime packages. DI is a tsyringe container using class-as-token (no string tokens); `reflect-metadata` is imported once at the entrypoint. Redis is Bun's built-in `RedisClient`; crypto is Web Crypto.
 - **Tests never hit the network** — inject `fetchFn`, use `as unknown as FetchFn`, record trimmed fixtures under `tests/fixtures/<platform>/`.
 - **`match()` compares `url.hostname` by exact Set membership** — never substrings (SSRF/spoofing).
 - **Version-fragile platform constants** (doc_ids, app-ids, GQL hashes, mobile-API ids) are env-overridable with pinned defaults, using `||`-fallback (so a blank `.env` value still uses the default — `??` would leak `""`).

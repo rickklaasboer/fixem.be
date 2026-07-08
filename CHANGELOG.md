@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.0](https://github.com///compare/v1.0.5...v1.1.0) (2026-07-08)
+
+### Features
+
+* add Gatus status monitoring to prod stack ([c870c8d](https://github.com///commit/c870c8dd85faad450fa2c43766bc005ab2672de7))
+
 ## [1.0.5](https://github.com///compare/v1.0.4...v1.0.5) (2026-07-08)
 
 ## [1.0.4](https://github.com///compare/v1.0.3...v1.0.4) (2026-07-08)

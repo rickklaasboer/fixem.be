@@ -1,13 +1,19 @@
 import {describe, expect, test} from 'bun:test';
-import {createRedditAdapter} from '../src/adapters/reddit';
-import type {FetchFn, PlatformAdapter} from '../src/adapters/types';
+import RedditAdapter from '../src/adapters/RedditAdapter';
+import Config from '../src/config/Config';
+import HttpClient from '../src/services/HttpClient';
+import type {FetchFn} from '../src/adapters/types';
 import {CHROME_UA} from '../src/lib/http';
 import imagePost from './fixtures/reddit/image-post.json';
 import videoPost from './fixtures/reddit/video-post.json';
 import galleryPost from './fixtures/reddit/gallery-post.json';
 import crosspost from './fixtures/reddit/crosspost.json';
 
-const CREDS = {clientId: 'id', clientSecret: 'secret'};
+const CREDS_CONFIG = {
+    redditClientId: 'id',
+    redditClientSecret: 'secret',
+} as unknown as Config;
+const NO_CREDS_CONFIG = {} as unknown as Config;
 
 function envelope(postData: object) {
     return [
@@ -18,7 +24,7 @@ function envelope(postData: object) {
 
 // Adapter on the OAuth JSON path: creds present, token served for the auth call,
 // the given post JSON for the API call. Exercises the rich JSON→metadata mapping.
-function jsonAdapter(body: unknown): PlatformAdapter {
+function jsonAdapter(body: unknown): RedditAdapter {
     const fetchFn = (async (input: unknown) => {
         if (String(input).includes('access_token')) {
             return new Response(
@@ -27,7 +33,7 @@ function jsonAdapter(body: unknown): PlatformAdapter {
         }
         return new Response(JSON.stringify(body), {status: 200});
     }) as unknown as FetchFn;
-    return createRedditAdapter(fetchFn, CREDS);
+    return new RedditAdapter(CREDS_CONFIG, new HttpClient(fetchFn));
 }
 
 // Minimal old.reddit post HTML carrying exactly the tags/attrs the scraper reads.
@@ -78,14 +84,14 @@ function oldRedditHtml(opts: {
     );
 }
 
-function htmlAdapter(html: string, status = 200): PlatformAdapter {
+function htmlAdapter(html: string, status = 200): RedditAdapter {
     const fetchFn = (async () =>
         new Response(html, {status})) as unknown as FetchFn;
-    return createRedditAdapter(fetchFn); // no creds → HTML path
+    return new RedditAdapter(NO_CREDS_CONFIG, new HttpClient(fetchFn)); // no creds → HTML path
 }
 
 describe('reddit adapter', () => {
-    const a = createRedditAdapter();
+    const a = new RedditAdapter(NO_CREDS_CONFIG, new HttpClient());
 
     test('match covers reddit hosts and redd.it', () => {
         expect(
@@ -204,7 +210,7 @@ describe('reddit adapter', () => {
             }
             return new Response(JSON.stringify(imagePost));
         }) as unknown as FetchFn;
-        const ad = createRedditAdapter(fetchFn, CREDS);
+        const ad = new RedditAdapter(CREDS_CONFIG, new HttpClient(fetchFn));
         await ad.resolve(
             new URL(
                 'https://www.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea/',
@@ -234,10 +240,13 @@ describe('reddit adapter', () => {
                 return new Response('nope', {status: 401});
             return new Response(JSON.stringify(imagePost));
         }) as unknown as FetchFn;
-        const ad = createRedditAdapter(fetchFn, {
-            clientId: 'id',
-            clientSecret: 'bad',
-        });
+        const ad = new RedditAdapter(
+            {
+                redditClientId: 'id',
+                redditClientSecret: 'bad',
+            } as unknown as Config,
+            new HttpClient(fetchFn),
+        );
         await expect(
             ad.resolve(
                 new URL('https://www.reddit.com/r/pics/comments/abc123/x/'),
@@ -267,7 +276,7 @@ describe('reddit adapter', () => {
             }
             return new Response(JSON.stringify(imagePost));
         }) as unknown as FetchFn;
-        const ad = createRedditAdapter(fetchFn, CREDS);
+        const ad = new RedditAdapter(CREDS_CONFIG, new HttpClient(fetchFn));
         const m = await ad.resolve(
             new URL('https://www.reddit.com/r/pics/s/AbCdEf123'),
         );
@@ -298,7 +307,7 @@ describe('reddit adapter', () => {
                 }),
             );
         }) as unknown as FetchFn;
-        const ad = createRedditAdapter(fetchFn); // no creds
+        const ad = new RedditAdapter(NO_CREDS_CONFIG, new HttpClient(fetchFn)); // no creds
         const m = await ad.resolve(
             new URL('https://www.reddit.com/r/pics/comments/abc123/a_sunset/'),
         );
@@ -399,9 +408,12 @@ describe('reddit adapter', () => {
                 oldRedditHtml({ogImage: 'https://i.redd.it/x.jpg'}),
             );
         }) as unknown as FetchFn;
-        const ad = createRedditAdapter(fetchFn, undefined, {
-            proxyUrl: 'https://proxy.example/fetch?u=',
-        });
+        const ad = new RedditAdapter(
+            {
+                redditProxyUrl: 'https://proxy.example/fetch?u=',
+            } as unknown as Config,
+            new HttpClient(fetchFn),
+        );
         const m = await ad.resolve(
             new URL('https://www.reddit.com/r/pics/comments/abc123/a_sunset/'),
         );
@@ -431,9 +443,12 @@ describe('reddit adapter', () => {
                 oldRedditHtml({ogImage: 'https://i.redd.it/x.jpg'}),
             );
         }) as unknown as FetchFn;
-        const ad = createRedditAdapter(fetchFn, undefined, {
-            proxyUrl: 'https://proxy.example/fetch?u=',
-        });
+        const ad = new RedditAdapter(
+            {
+                redditProxyUrl: 'https://proxy.example/fetch?u=',
+            } as unknown as Config,
+            new HttpClient(fetchFn),
+        );
         await ad.resolve(new URL('https://www.reddit.com/r/pics/s/AbCdEf123'));
         expect(requests[0]).toBe(
             'https://proxy.example/fetch?u=' +
@@ -461,9 +476,12 @@ describe('reddit adapter', () => {
                 oldRedditHtml({ogImage: 'https://i.redd.it/x.jpg'}),
             );
         }) as unknown as FetchFn;
-        const ad = createRedditAdapter(fetchFn, undefined, {
-            httpProxy: 'http://user:pass@gw.dataimpulse.com:823',
-        });
+        const ad = new RedditAdapter(
+            {
+                redditHttpProxy: 'http://user:pass@gw.dataimpulse.com:823',
+            } as unknown as Config,
+            new HttpClient(fetchFn),
+        );
         await ad.resolve(new URL('https://www.reddit.com/r/pics/s/AbCdEf123'));
         // share probe + old.reddit HTML fetch, both through the CONNECT proxy
         expect(proxies).toEqual([
@@ -486,9 +504,14 @@ describe('reddit adapter', () => {
             }
             return new Response(JSON.stringify(imagePost));
         }) as unknown as FetchFn;
-        const ad = createRedditAdapter(fetchFn, CREDS, {
-            httpProxy: 'http://user:pass@gw.dataimpulse.com:823',
-        });
+        const ad = new RedditAdapter(
+            {
+                redditClientId: 'id',
+                redditClientSecret: 'secret',
+                redditHttpProxy: 'http://user:pass@gw.dataimpulse.com:823',
+            } as unknown as Config,
+            new HttpClient(fetchFn),
+        );
         await ad.resolve(
             new URL(
                 'https://www.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea/',

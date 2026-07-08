@@ -1,5 +1,12 @@
 import type {EmbedMetadata, FetchFn, PlatformAdapter} from './types';
 import {PLATFORM_UA, withSignal} from '../lib/http';
+import {TWITCH_GQL_DEFAULTS, type TwitchGqlConfig} from '@/config/defaults';
+
+// Re-export the relocated Twitch web-client constants so existing importers
+// (lib/config.ts, tests) keep resolving them from this module. Removed when this
+// adapter is converted to a class.
+export {TWITCH_GQL_DEFAULTS};
+export type {TwitchGqlConfig};
 
 const HOSTS = new Set([
     'clips.twitch.tv',
@@ -10,18 +17,6 @@ const HOSTS = new Set([
 const SLUG_RE = /^[A-Za-z0-9_-]+$/;
 const CLIPS_HOST_RE = /^\/([A-Za-z0-9_-]+)\/?$/;
 const CHANNEL_CLIP_RE = /^\/[^/]+\/clip\/([A-Za-z0-9_-]+)\/?$/;
-
-export interface TwitchGqlConfig {
-    clientId: string;
-    clipTokenHash: string;
-}
-
-// Public web client constants (research §1c) — env-overridable via config.
-export const TWITCH_GQL_DEFAULTS: TwitchGqlConfig = {
-    clientId: 'kimne78kx3ncx6brgo4mv6wki5h1ko',
-    clipTokenHash:
-        '36b89d2507fce29e5ca551df756d27c1cfe079e2609642b4390aa4c35796eb11',
-};
 
 interface HelixClip {
     title: string;

@@ -1,6 +1,13 @@
 import type {EmbedMetadata, FetchFn, PlatformAdapter} from './types';
 import {truncate} from '../lib/text';
 import {FIREFOX_UA, withSignal} from '../lib/http';
+import {THREADS_DEFAULTS, type ThreadsConfig} from '@/config/defaults';
+
+// Re-export the relocated Threads web-client constants so existing importers
+// (lib/config.ts, tests) keep resolving them from this module. Removed when this
+// adapter is converted to a class.
+export {THREADS_DEFAULTS};
+export type {ThreadsConfig};
 
 const HOSTS = new Set([
     'threads.net',
@@ -21,26 +28,6 @@ const MEDIA_TTL_SECONDS = 3600;
 const MEDIA_PROXY_HEADERS: Record<string, string> = {
     'User-Agent': FIREFOX_UA,
     Referer: 'https://www.threads.com/',
-};
-
-// Version-fragile pinned web-client constants. Meta rotates these a few times a
-// year, so they're externalized: breakage becomes a config change, not a code
-// change (matches how twitch.ts exports TWITCH_GQL_DEFAULTS).
-export interface ThreadsConfig {
-    lsd: string;
-    docId: string;
-    appId: string;
-    friendlyName: string;
-}
-
-export const THREADS_DEFAULTS: ThreadsConfig = {
-    lsd: 'XudMkvWGqcnLxbgeR25f3V',
-    // Refreshed 2026-07: the post query was renamed BarcelonaPostPageQuery →
-    // BarcelonaPostPageDirectQuery (doc_id changed to match). Verify/refresh from
-    // the Threads web bundles when Meta rotates these.
-    docId: '36633640579617733',
-    appId: '238260118697367',
-    friendlyName: 'BarcelonaPostPageDirectQuery',
 };
 
 interface ThreadsMediaNode {

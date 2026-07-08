@@ -1,6 +1,12 @@
 import type {EmbedMetadata, FetchFn, PlatformAdapter} from './types';
 import {truncate} from '../lib/text';
 import {PLATFORM_UA, withSignal} from '../lib/http';
+import {SYNDICATION_FEATURES} from '@/config/defaults';
+
+// Re-export the relocated syndication feature flags so existing importers
+// (lib/config.ts, tests) keep resolving them from this module. Removed when this
+// adapter is converted to a class.
+export {SYNDICATION_FEATURES};
 
 const HOSTS = new Set([
     'twitter.com',
@@ -13,24 +19,6 @@ const HOSTS = new Set([
 // (?=\/|$) — a malformed ID like /status/123abc must not match-and-truncate
 // to tweet 123.
 const PATH_RE = /^\/([A-Za-z0-9_]{1,15})\/status(?:es)?\/(\d{1,20})(?=\/|$)/;
-
-// react-tweet's syndication feature flags — cosmetic but required (research §2a).
-export const SYNDICATION_FEATURES = [
-    'tfw_timeline_list:',
-    'tfw_follower_count_sunset:true',
-    'tfw_tweet_edit_backend:on',
-    'tfw_refsrc_session:on',
-    'tfw_fosnr_soft_interventions_enabled:on',
-    'tfw_show_birdwatch_pivots_enabled:on',
-    'tfw_show_business_verified_badge:on',
-    'tfw_duplicate_scribes_to_settings:on',
-    'tfw_use_profile_image_shape_enabled:on',
-    'tfw_show_blue_verified_badge:on',
-    'tfw_legacy_timeline_sunset:true',
-    'tfw_show_gov_verified_badge:on',
-    'tfw_show_business_affiliate_badge:on',
-    'tfw_tweet_edit_frontend:on',
-].join(';');
 
 // Required by the syndication endpoint or it 404s (react-tweet algorithm, verbatim).
 export function syndicationToken(id: string): string {

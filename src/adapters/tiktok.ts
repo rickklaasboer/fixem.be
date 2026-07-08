@@ -1,6 +1,13 @@
 import type {EmbedMetadata, FetchFn, PlatformAdapter} from './types';
 import {truncate} from '../lib/text';
 import {CHROME_UA, withSignal} from '../lib/http';
+import {TIKTOK_DEFAULTS, type TiktokConfig} from '@/config/defaults';
+
+// Re-export the relocated TikTok web-client constants so existing importers
+// (lib/config.ts, tests) keep resolving them from this module. Removed when this
+// adapter is converted to a class.
+export {TIKTOK_DEFAULTS};
+export type {TiktokConfig};
 
 const MAIN_HOSTS = new Set(['tiktok.com', 'www.tiktok.com', 'm.tiktok.com']);
 const SHORT_HOSTS = new Set(['vm.tiktok.com', 'vt.tiktok.com']);
@@ -30,22 +37,6 @@ function mediaProxyHeaders(cookie: string): Record<string, string> {
         ...(cookie ? {Cookie: cookie} : {}),
     };
 }
-
-export interface TiktokConfig {
-    rehydrationScriptId: string;
-    // Wired for the future mobile-API fallback (research §3 Option B); the current
-    // implementation uses only the web rehydration scrape (Option A).
-    mobileApiHost: string;
-    iid: string;
-    deviceId: string;
-}
-
-export const TIKTOK_DEFAULTS: TiktokConfig = {
-    rehydrationScriptId: '__UNIVERSAL_DATA_FOR_REHYDRATION__',
-    mobileApiHost: 'api22-normal-c-alisg.tiktokv.com',
-    iid: '7318518857994389254',
-    deviceId: '7318517321748022790',
-};
 
 interface ItemStruct {
     id?: string;

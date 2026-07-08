@@ -2,6 +2,13 @@ import type {EmbedMetadata, FetchFn, PlatformAdapter} from './types';
 import {truncate} from '../lib/text';
 import {CHROME_UA, withSignal} from '../lib/http';
 import {fetchSnapsaveMedia} from './snapsave';
+import {INSTAGRAM_DEFAULTS, type InstagramConfig} from '@/config/defaults';
+
+// Re-export the relocated Instagram web-client constants so existing importers
+// (lib/config.ts, tests) keep resolving them from this module. Removed when this
+// adapter is converted to a class.
+export {INSTAGRAM_DEFAULTS};
+export type {InstagramConfig};
 
 const HOSTS = new Set([
     'instagram.com',
@@ -21,32 +28,6 @@ const MEDIA_TTL_SECONDS = 3600;
 const MEDIA_PROXY_HEADERS: Record<string, string> = {
     'User-Agent': CHROME_UA,
     Referer: 'https://www.instagram.com/',
-};
-
-// Version-fragile pinned web-client constants. Meta rotates these a few times a
-// year, so they're externalized: breakage becomes a config change, not a code
-// change (mirrors threads.ts's THREADS_DEFAULTS). `proxyUrl` is an optional
-// residential-proxy offload hook — see resolve().
-export interface InstagramConfig {
-    docId: string;
-    appId: string;
-    friendlyName: string;
-    proxyUrl?: string;
-    // Optional logged-in session cookie (a burner's `sessionid=...`, ideally with
-    // `csrftoken`/`ds_user_id`). When set, the GraphQL call authenticates and walks
-    // past the login wall. SECURITY: this is a full account credential — it is only
-    // sent on the metadata request, is never logged, and never enters the /v/ proxy
-    // token (media replays on its own signed URL). Burners get banned; expect churn.
-    cookie?: string;
-    // Opt-in last-resort fallback: when our own fetch is login-walled, resolve via
-    // snapsave.app (third-party, fragile — see snapsave.ts). Off by default.
-    snapsave?: boolean;
-}
-
-export const INSTAGRAM_DEFAULTS: InstagramConfig = {
-    docId: '25531498899829322',
-    appId: '936619743392459',
-    friendlyName: 'PolarisPostActionLoadPostQueryQuery',
 };
 
 // --- Authenticated mobile private-API (i.instagram.com) types + helpers ---

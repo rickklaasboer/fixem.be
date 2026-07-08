@@ -1,10 +1,12 @@
 import {describe, expect, test} from 'bun:test';
-import {loadConfig} from '../src/lib/config';
-import {TWITCH_GQL_DEFAULTS} from '../src/adapters/twitch';
-import {SYNDICATION_FEATURES} from '../src/adapters/twitter';
-import {THREADS_DEFAULTS} from '../src/adapters/threads';
-import {TIKTOK_DEFAULTS} from '../src/adapters/tiktok';
-import {INSTAGRAM_DEFAULTS} from '../src/adapters/instagram';
+import {loadConfig} from '@/config/Config';
+import {
+    INSTAGRAM_DEFAULTS,
+    SYNDICATION_FEATURES,
+    THREADS_DEFAULTS,
+    TIKTOK_DEFAULTS,
+    TWITCH_GQL_DEFAULTS,
+} from '@/config/defaults';
 
 describe('loadConfig', () => {
     test('applies defaults for empty env', () => {

@@ -8,7 +8,7 @@
         "noEmit": true,
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
-        "paths": {"@/*": ["./src/*"]},
+        "paths": { "@/*": ["./src/*"] },
         "types": ["bun"],
         "skipLibCheck": true
     },

@@ -112,6 +112,27 @@ docker compose down          # stop
 docker compose logs -f app   # tail app logs
 ```
 
+### Deploying the published image
+
+`compose.yaml` builds locally (for development). For deployment, use
+`compose.prod.yaml`, which pulls the prebuilt image from GHCR
+(`ghcr.io/rickklaasboer/fixem.be`) instead of building:
+
+```bash
+docker compose -f compose.prod.yaml pull     # fetch the newest image
+docker compose -f compose.prod.yaml up -d     # (re)start
+```
+
+It defaults to the `latest` tag; pin a release with `FIXEM_TAG`:
+
+```bash
+FIXEM_TAG=1.0.0 docker compose -f compose.prod.yaml up -d
+```
+
+Put real config in a `.env` file next to the compose file (see
+[Configuration](#configuration)). Images are published automatically on every
+merge to `main` (see the CI pipeline in `.github/workflows/`).
+
 ---
 
 ## Configuration

@@ -17,6 +17,15 @@ function tag(kind: "property" | "name", key: string, value: string | number): st
 // bare 302 for these (no embed to build), which is invisible when you append
 // ?fixem=preview to debug — so instead of silently redirecting, explain why.
 const SUPPORTED = "Reddit · Bluesky · X (Twitter) · Threads · Instagram · TikTok · Twitch clips";
+
+// Shared webfont setup for the human-facing ?fixem=preview pages (matches the
+// landing page). The crawler-facing redirect page stays external-font-free.
+const FONT_LINKS = `<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">`;
+const SANS = `"DM Sans",system-ui,sans-serif`;
+const TITLE_FONT = `"Montserrat",sans-serif`;
+const MONO = `ui-monospace,"JetBrains Mono",monospace`;
 export function renderPreviewNoAdapter(targetUrl: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -24,17 +33,18 @@ export function renderPreviewNoAdapter(targetUrl: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>fixem.be — no adapter matched</title>
+${FONT_LINKS}
 <style>
 :root{color-scheme:light}
-body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:24px;background:#f7f7f5;color:#16171d;font:14px/1.6 ui-monospace,"JetBrains Mono",monospace}
+body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:24px;background:#f7f7f5;color:#16171d;font:14px/1.6 ${SANS}}
 main{max-width:560px}
-h1{font-size:22px;color:#5058e0;letter-spacing:-.02em;margin:0 0 12px}
+h1{font-family:${TITLE_FONT};font-size:22px;color:#5058e0;letter-spacing:-.02em;margin:0 0 12px}
 p{color:#6a6d78;margin:0 0 12px}
 b{color:#16171d;font-weight:400}
-code{background:#fff;border:1px solid #e2e2dd;border-radius:6px;padding:2px 6px;color:#5058e0}
-.url{word-break:break-all}
+code{font:13px/1.6 ${MONO};background:#fff;border:1px solid #e2e2dd;border-radius:6px;padding:2px 6px;color:#5058e0}
+.url{word-break:break-all;font-family:${MONO};font-size:13px}
 a{color:#5058e0;text-decoration:none}a:hover{text-decoration:underline}
-.tag{display:inline-block;font-size:12px;color:#5058e0;border:1px solid #5058e0;border-radius:4px;padding:1px 7px;margin-bottom:14px}
+.tag{display:inline-block;font-family:${MONO};font-size:12px;color:#5058e0;border:1px solid #5058e0;border-radius:4px;padding:1px 7px;margin-bottom:14px}
 </style>
 </head>
 <body>
@@ -100,14 +110,15 @@ export function renderPreviewReport(opts: {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>fixem.be preview — ${esc(meta.title)}</title>
+${FONT_LINKS}
 <style>
 :root{color-scheme:light}
 *{box-sizing:border-box}
-body{margin:0;min-height:100dvh;padding:24px;background:#f7f7f5;color:#16171d;font:14px/1.6 ui-monospace,"JetBrains Mono",monospace;display:flex;justify-content:center}
+body{margin:0;min-height:100dvh;padding:24px;background:#f7f7f5;color:#16171d;font:14px/1.6 ${SANS};display:flex;justify-content:center}
 main{width:100%;max-width:680px}
-.tag{display:inline-block;font-size:12px;color:#5058e0;border:1px solid #5058e0;border-radius:4px;padding:1px 7px}
-h1{font-size:20px;color:#5058e0;letter-spacing:-.02em;margin:12px 0 4px}
-h2{font-size:12px;font-weight:700;letter-spacing:.04em;color:#6a6d78;text-transform:uppercase;margin:26px 0 10px}
+.tag{display:inline-block;font-family:${MONO};font-size:12px;color:#5058e0;border:1px solid #5058e0;border-radius:4px;padding:1px 7px}
+h1{font-family:${TITLE_FONT};font-size:20px;color:#5058e0;letter-spacing:-.02em;margin:12px 0 4px}
+h2{font-family:${TITLE_FONT};font-size:12px;font-weight:700;letter-spacing:.04em;color:#6a6d78;text-transform:uppercase;margin:26px 0 10px}
 .status{font-size:13px;margin:0}
 .status .ok{color:#1a7f37}.status .warn{color:#b5480f}
 a{color:#5058e0;text-decoration:none;word-break:break-all}a:hover{text-decoration:underline}
@@ -118,11 +129,11 @@ a{color:#5058e0;text-decoration:none;word-break:break-all}a:hover{text-decoratio
 .media{max-width:100%;border-radius:6px;display:block;background:#f0f0ec;max-height:340px}
 .nomedia{font-size:12px;color:#8a8d98;padding:8px 0}
 table{border-collapse:collapse;width:100%;background:#fff;border:1px solid #e2e2dd;border-radius:8px;overflow:hidden}
-th,td{text-align:left;vertical-align:top;padding:7px 12px;font-size:13px;border-top:1px solid #eee}
+th,td{text-align:left;vertical-align:top;padding:7px 12px;font:13px/1.6 ${MONO};border-top:1px solid #eee}
 tr:first-child th,tr:first-child td{border-top:none}
 th{color:#6a6d78;font-weight:400;width:110px;white-space:nowrap}
 td{color:#16171d;word-break:break-all}
-pre{background:#fff;border:1px solid #e2e2dd;border-radius:8px;padding:12px 14px;overflow-x:auto;font-size:12px;color:#3a3d47;margin:0}
+pre{background:#fff;border:1px solid #e2e2dd;border-radius:8px;padding:12px 14px;overflow-x:auto;font:12px/1.6 ${MONO};color:#3a3d47;margin:0}
 </style>
 </head>
 <body>

@@ -38,6 +38,7 @@ function oldRedditHtml(opts: {
   domain?: string;
   dataUrl?: string;
   isGallery?: boolean;
+  galleryMediaIds?: string[];
 }): string {
   const {
     title = "A title",
@@ -48,7 +49,17 @@ function oldRedditHtml(opts: {
     domain = "i.redd.it",
     dataUrl = "https://i.redd.it/x.jpg",
     isGallery = false,
+    galleryMediaIds,
   } = opts;
+  // Galleries render a media-preview div listing ordered media ids, plus signed
+  // preview.redd.it tile images per id (mirrors real old.reddit markup).
+  const gallery = galleryMediaIds
+    ? `<div class="media-preview" data-media-ids="${galleryMediaIds.join(",")}" id="media-preview-abc">` +
+      galleryMediaIds
+        .map((id) => `<img src="https://preview.redd.it/${id}.jpg?width=108&amp;crop=smart&amp;s=aa">`)
+        .join("") +
+      `</div>`
+    : "";
   return (
     `<!doctype html><html><head>` +
     `<meta property="og:title" content="${title}">` +
@@ -57,6 +68,7 @@ function oldRedditHtml(opts: {
     `<div class="thing" data-fullname="t3_abc" data-type="link" data-is-gallery="${isGallery}" ` +
     `data-author="${author}" data-subreddit="${subreddit}" data-url="${dataUrl}" ` +
     `data-domain="${domain}" data-nsfw="${nsfw}"></div>` +
+    gallery +
     `</body></html>`
   );
 }
@@ -237,7 +249,25 @@ describe("reddit adapter", () => {
     expect(m.nsfw).toBe(true);
   });
 
-  test("html: gallery post", async () => {
+  test("html: gallery uses the first item's i.redd.it original, not the og:image", async () => {
+    // Real old.reddit gallery pages advertise an external-preview.redd.it share
+    // crop as og:image that Reddit never generated (S3 AccessDenied) — the
+    // working original lives unsigned at i.redd.it/<media_id>.<ext>.
+    const m = await htmlAdapter(
+      oldRedditHtml({
+        isGallery: true,
+        domain: "reddit.com",
+        ogImage:
+          "https://external-preview.redd.it/nz4gwf6g3ybh1.jpg?width=1200&amp;height=628.272251309&amp;auto=webp&amp;s=9d56",
+        galleryMediaIds: ["nz4gwf6g3ybh1", "ma5jlf6g3ybh1", "yqaohf6g3ybh1"],
+      }),
+    ).resolve(new URL("https://www.reddit.com/r/travel/comments/abc/x/"));
+    expect(m.kind).toBe("gallery");
+    expect(m.image?.url).toBe("https://i.redd.it/nz4gwf6g3ybh1.jpg");
+    expect(m.description).toBe("Gallery • 3 images");
+  });
+
+  test("html: gallery without media-preview markup falls back to og:image", async () => {
     const m = await htmlAdapter(
       oldRedditHtml({ isGallery: true, domain: "reddit.com", ogImage: "https://preview.redd.it/g1.jpg" }),
     ).resolve(new URL("https://www.reddit.com/r/travel/comments/abc/x/"));

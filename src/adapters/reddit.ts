@@ -150,6 +150,22 @@ function metaContent(html: string, property: string): string | undefined {
   return m ? decodeEntities(m[1]!) : undefined;
 }
 
+// Gallery pages advertise an external-preview.redd.it share crop as og:image
+// that Reddit often never generated (S3 AccessDenied), so embeds would show a
+// dead image. The page's media-preview div lists the ordered media ids, and the
+// original upload is served unsigned at i.redd.it/<media_id>.<ext> — use that.
+// The extension comes from the id's signed preview.redd.it tile URL.
+function galleryFirstImage(
+  html: string,
+): { url: string; count: number } | undefined {
+  const ids = html.match(/data-media-ids="([^"]+)"/)?.[1]?.split(",").filter(Boolean);
+  const first = ids?.[0];
+  if (!ids || !first) return undefined;
+  const ext = html.match(new RegExp(`preview\\.redd\\.it/${first}\\.(\\w+)`))?.[1];
+  if (!ext) return undefined;
+  return { url: `https://i.redd.it/${first}.${ext}`, count: ids.length };
+}
+
 // Anonymous fallback: Reddit disabled the public `.json` API (returns 403 + the
 // web-app shell) regardless of IP/UA, and OAuth credentials are now approval-
 // gated. old.reddit.com still server-renders logged-out post HTML, so we scrape
@@ -165,18 +181,26 @@ function parseOldRedditHtml(html: string, canonical: string): EmbedMetadata {
   const nsfw = dataAttr("data-nsfw") === "true";
   const domain = dataAttr("data-domain") ?? "";
   const isGallery = dataAttr("data-is-gallery") === "true";
-  const image = metaContent(html, "og:image");
+  let image = metaContent(html, "og:image");
   const title = metaContent(html, "og:title") ?? `Post from r/${subreddit}`;
 
   let kind: EmbedMetadata["kind"] = "link";
-  if (isGallery) kind = "gallery";
-  else if (domain === "i.redd.it" || /\.(jpe?g|png|gif|webp)(\?|$)/i.test(dataAttr("data-url") ?? "")) {
+  let description: string | undefined;
+  if (isGallery) {
+    kind = "gallery";
+    const gallery = galleryFirstImage(html);
+    if (gallery) {
+      image = gallery.url;
+      description = `Gallery • ${gallery.count} image${gallery.count === 1 ? "" : "s"}`;
+    }
+  } else if (domain === "i.redd.it" || /\.(jpe?g|png|gif|webp)(\?|$)/i.test(dataAttr("data-url") ?? "")) {
     kind = "image";
   } else if (image) kind = "image"; // link/video posts still carry a preview thumbnail
 
   return {
     kind,
     title,
+    description,
     author: { name: `u/${author}`, url: `https://www.reddit.com/user/${author}` },
     siteName: `Reddit • r/${subreddit}`,
     themeColor: "#FF4500",

@@ -11,22 +11,23 @@
 <meta property="og:description" content="Prepend fixem.be/ to a social link for working Discord embeds.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=DM+Sans:wght@400;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 <style>
   :root { --bg:#f7f7f5; --text:#16171d; --muted:#6a6d78; --accent:#5058e0; --line:#e2e2dd; }
   * { margin:0; padding:0; box-sizing:border-box; }
   body {
     background:var(--bg); color:var(--text);
-    font-family:"JetBrains Mono", ui-monospace, monospace;
+    font-family:"DM Sans", system-ui, sans-serif;
     min-height:100dvh; display:grid; place-items:center;
     padding:24px; line-height:1.6;
   }
   main { max-width:560px; }
-  h1 { font-size:clamp(34px,10vw,52px); letter-spacing:-.03em; color:var(--accent); }
+  h1 { font-family:"Montserrat", sans-serif; font-weight:700; font-size:clamp(34px,10vw,52px); letter-spacing:-.03em; color:var(--accent); }
   h1 span { color:var(--text); }
   p { color:var(--muted); font-size:15px; margin-top:14px; }
   p b { color:var(--accent); font-weight:400; }
   code {
+    font-family:"JetBrains Mono", ui-monospace, monospace;
     display:block; margin-top:22px; padding:13px 15px;
     background:#fff; border:1px solid var(--line); border-radius:6px; font-size:13px;
     color:var(--muted); overflow-x:auto; white-space:nowrap;
@@ -36,10 +37,7 @@
   .reel { display:block; }
   .reel span { display:block; height:1.6em; line-height:1.6em; }
   .reel.roll { transition:transform .55s cubic-bezier(.5,0,.15,1); }
-  h2 { font-size:13px; font-weight:700; color:var(--text); margin-top:30px; letter-spacing:.02em; }
-  ul { list-style:none; margin-top:10px; display:flex; flex-wrap:wrap; gap:6px 10px; }
-  li { color:var(--muted); font-size:13px; }
-  li::before { content:"\203A"; color:var(--accent); margin-right:6px; }
+  .platforms { font-size:13px; margin-top:14px; }
   .tip { margin-top:22px; font-size:13px; }
   .tip code { display:inline; margin:0; padding:2px 6px; white-space:normal; }
   a { color:var(--accent); text-decoration:none; }
@@ -57,11 +55,7 @@
     <p>Working Discord embeds for broken social links. Prepend <b>fixem.be/</b> to a link before you post it — crawlers get a rich embed, humans land on the original.</p>
     <code><b>fixem.be/</b><span class="slot"><span class="reel" id="reel"></span></span></code>
 
-    <h2>SUPPORTED</h2>
-    <ul>
-      <li>Reddit</li><li>Bluesky</li><li>Twitter / X</li><li>Twitch clips</li>
-      <li>TikTok</li><li>Instagram</li><li>Threads</li>
-    </ul>
+    <p class="platforms">Reddit · Bluesky · X (Twitter) · Threads · Instagram · TikTok · Twitch clips</p>
 
     <p class="tip">Debugging? Append <code>?fixem=preview</code> to any link to inspect the embed HTML in your browser.</p>
 

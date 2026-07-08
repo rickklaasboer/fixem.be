@@ -1,6 +1,6 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
 import { truncate } from "../lib/text";
-import { PLATFORM_UA } from "../lib/http";
+import { PLATFORM_UA, withSignal } from "../lib/http";
 
 const HOSTS = new Set([
   "twitter.com",
@@ -77,7 +77,8 @@ export function createTwitterAdapter(
       const p = parts(url)!;
       return `https://x.com/${p.user}/status/${p.id}`;
     },
-    async resolve(url): Promise<EmbedMetadata> {
+    async resolve(url, signal): Promise<EmbedMetadata> {
+      const f = withSignal(fetchFn, signal);
       const p = parts(url);
       if (!p) throw new Error("twitter: not a status URL");
       const canonical = `https://x.com/${p.user}/status/${p.id}`;
@@ -85,7 +86,7 @@ export function createTwitterAdapter(
         `https://cdn.syndication.twimg.com/tweet-result?id=${p.id}` +
         `&lang=en&token=${syndicationToken(p.id)}` +
         `&features=${encodeURIComponent(features)}`;
-      const res = await fetchFn(apiUrl, { headers: { "User-Agent": PLATFORM_UA } });
+      const res = await f(apiUrl, { headers: { "User-Agent": PLATFORM_UA } });
       if (!res.ok) throw new Error(`twitter ${res.status}`);
       const j = (await res.json()) as SynTweet;
       if (!j || !j.__typename) throw new Error("twitter: tweet unavailable");

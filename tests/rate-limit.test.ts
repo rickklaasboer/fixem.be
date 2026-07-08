@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { clientIp, MemoryRateLimitStore } from "../src/lib/rate-limit";
+import type { RedisClient } from "bun";
+import { clientIp, MemoryRateLimitStore, RedisRateLimitStore } from "../src/lib/rate-limit";
 
 describe("MemoryRateLimitStore", () => {
   test("counts hits within window, expires old ones", async () => {
@@ -10,6 +11,15 @@ describe("MemoryRateLimitStore", () => {
     expect(await s.hit("ip2", w, 2_000)).toBe(1); // separate key
     // 61s later: first two hits fell out of the window
     expect(await s.hit("ip1", w, 62_500)).toBe(1);
+  });
+});
+
+describe("RedisRateLimitStore fail-open", () => {
+  test("hit returns 0 (never rate-limits) when Redis is unreachable", async () => {
+    // 0 hits < any positive limit → the caller lets the request through, so a
+    // Redis outage disables rate limiting rather than blocking traffic.
+    const downClient = { send: async () => { throw new Error("redis down"); } } as unknown as RedisClient;
+    expect(await new RedisRateLimitStore(downClient).hit("ip1", 60_000, 1_000)).toBe(0);
   });
 });
 

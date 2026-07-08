@@ -1,5 +1,5 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
-import { PLATFORM_UA } from "../lib/http";
+import { PLATFORM_UA, withSignal } from "../lib/http";
 
 const HOSTS = new Set(["clips.twitch.tv", "twitch.tv", "www.twitch.tv", "m.twitch.tv"]);
 const SLUG_RE = /^[A-Za-z0-9_-]+$/;
@@ -47,9 +47,9 @@ export function createTwitchAdapter(
 ): PlatformAdapter {
   let token: { value: string; expiresAt: number } | null = null;
 
-  async function appToken(): Promise<string> {
+  async function appToken(f: FetchFn): Promise<string> {
     if (token && Date.now() < token.expiresAt - 60_000) return token.value;
-    const res = await fetchFn("https://id.twitch.tv/oauth2/token", {
+    const res = await f("https://id.twitch.tv/oauth2/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": PLATFORM_UA },
       body: new URLSearchParams({
@@ -65,17 +65,17 @@ export function createTwitchAdapter(
     return token.value;
   }
 
-  async function helixClip(slug: string, retried = false): Promise<HelixClip> {
-    const res = await fetchFn(`https://api.twitch.tv/helix/clips?id=${encodeURIComponent(slug)}`, {
+  async function helixClip(f: FetchFn, slug: string, retried = false): Promise<HelixClip> {
+    const res = await f(`https://api.twitch.tv/helix/clips?id=${encodeURIComponent(slug)}`, {
       headers: {
-        Authorization: `Bearer ${await appToken()}`,
+        Authorization: `Bearer ${await appToken(f)}`,
         "Client-Id": creds.clientId,
         "User-Agent": PLATFORM_UA,
       },
     });
     if (res.status === 401 && !retried) {
       token = null; // app tokens have no refresh flow — re-mint and retry once
-      return helixClip(slug, true);
+      return helixClip(f, slug, true);
     }
     if (!res.ok) throw new Error(`twitch helix ${res.status}`);
     const j = (await res.json()) as { data?: HelixClip[] };
@@ -86,9 +86,9 @@ export function createTwitchAdapter(
 
   // Best-effort: a clip embed without inline video is still useful, so GQL
   // failures return undefined instead of failing the whole resolve.
-  async function clipMp4(slug: string): Promise<EmbedMetadata["video"]> {
+  async function clipMp4(f: FetchFn, slug: string): Promise<EmbedMetadata["video"]> {
     try {
-      const res = await fetchFn("https://gql.twitch.tv/gql", {
+      const res = await f("https://gql.twitch.tv/gql", {
         method: "POST",
         headers: { "Client-ID": gql.clientId, "Content-Type": "application/json", "User-Agent": PLATFORM_UA },
         body: JSON.stringify({
@@ -132,10 +132,11 @@ export function createTwitchAdapter(
     canonicalize(url) {
       return `https://clips.twitch.tv/${slugFrom(url)}`;
     },
-    async resolve(url): Promise<EmbedMetadata> {
+    async resolve(url, signal): Promise<EmbedMetadata> {
+      const f = withSignal(fetchFn, signal);
       const slug = slugFrom(url);
       if (!slug) throw new Error("twitch: no clip slug");
-      const [clip, video] = await Promise.all([helixClip(slug), clipMp4(slug)]);
+      const [clip, video] = await Promise.all([helixClip(f, slug), clipMp4(f, slug)]);
       return {
         kind: video ? "video" : "image",
         title: clip.title,

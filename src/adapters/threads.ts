@@ -1,6 +1,6 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
 import { truncate } from "../lib/text";
-import { FIREFOX_UA } from "../lib/http";
+import { FIREFOX_UA, withSignal } from "../lib/http";
 
 const HOSTS = new Set(["threads.net", "www.threads.net", "threads.com", "www.threads.com"]);
 const POST_RE = /^\/@([^/]+)\/post\/([^/]+)\/?$/;
@@ -117,8 +117,8 @@ export function createThreadsAdapter(
   cfg: ThreadsConfig = THREADS_DEFAULTS,
 ): PlatformAdapter {
   // Step 1: resolve the URL path to the numeric post id via bulk-route.
-  async function resolvePostId(pathname: string): Promise<string> {
-    const res = await fetchFn(ROUTE_URL, {
+  async function resolvePostId(f: FetchFn, pathname: string): Promise<string> {
+    const res = await f(ROUTE_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -147,8 +147,8 @@ export function createThreadsAdapter(
   }
 
   // Step 2: fetch the post payload via GraphQL.
-  async function fetchPost(postId: string): Promise<ThreadsPost | undefined> {
-    const res = await fetchFn(GRAPHQL_URL, {
+  async function fetchPost(f: FetchFn, postId: string): Promise<ThreadsPost | undefined> {
+    const res = await f(GRAPHQL_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -192,14 +192,15 @@ export function createThreadsAdapter(
       const p = parsePath(url);
       return p ? canonicalFor(p) : url.href;
     },
-    async resolve(url): Promise<EmbedMetadata> {
+    async resolve(url, signal): Promise<EmbedMetadata> {
+      const f = withSignal(fetchFn, signal);
       const p = parsePath(url);
       if (!p) throw new Error("threads: not a post URL");
       const canonical = canonicalFor(p);
       const pathUser = p.form === "post" ? p.user : undefined;
 
-      const postId = await resolvePostId(url.pathname);
-      const post = await fetchPost(postId);
+      const postId = await resolvePostId(f, url.pathname);
+      const post = await fetchPost(f, postId);
 
       if (!post) {
         // Reachable but no data (private/deleted/blocked): an honest text embed

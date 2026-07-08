@@ -188,6 +188,62 @@ describe("/v/ proxy", () => {
     await expect(res.text()).rejects.toThrow(); // body stream errors past the ceiling
   });
 
+  test("concurrency cap counts in-flight streaming transfers, not just the header phase", async () => {
+    // Upstream sends headers immediately but holds the body open until `gate`
+    // resolves. Before the fix, `inflight` was decremented when the Response was
+    // built (headers received), so the cap bounded nothing while bodies streamed.
+    let openGate!: () => void;
+    const gate = new Promise<void>((r) => (openGate = r));
+    const fetchFn = (async () => {
+      const stream = new ReadableStream<Uint8Array>({
+        async start(ctrl) {
+          ctrl.enqueue(new TextEncoder().encode("chunk"));
+          await gate; // hold the transfer in-flight
+          ctrl.close();
+        },
+      });
+      return new Response(stream, { status: 200, headers: { "content-type": "video/mp4" } });
+    }) as unknown as FetchFn;
+    const config = loadConfig({ PROXY_SECRET: SECRET, PROXY_MAX_CONCURRENT: "1" });
+    const app = new Hono();
+    mountProxy(app, { config, logger: silent, fetchFn, now: () => 1000 });
+    const tok = await tokenFor("https://v16.tiktokcdn.com/a.mp4");
+
+    // First request occupies the only slot; its body is still streaming (unread).
+    const res1 = await app.request(`/v/${tok}`);
+    expect(res1.status).toBe(200);
+    // Second concurrent request must be rejected — the transfer is still live.
+    const res2 = await app.request(`/v/${tok}`);
+    expect(res2.status).toBe(503);
+    // Let the first transfer finish and drain it so its slot is released.
+    openGate();
+    expect(await res1.text()).toBe("chunk");
+    // Slot freed → a subsequent request succeeds again.
+    const res3 = await app.request(`/v/${tok}`);
+    expect(res3.status).toBe(200);
+    expect(await res3.text()).toBe("chunk");
+  });
+
+  test("aborts a stalled upstream body via the idle-read timeout", async () => {
+    // Upstream sends headers + one chunk, then goes silent forever (never sends
+    // more, never closes). The idle-read watchdog must error the body instead of
+    // hanging the transfer open indefinitely.
+    const fetchFn = (async () => {
+      const stream = new ReadableStream<Uint8Array>({
+        start(ctrl) {
+          ctrl.enqueue(new TextEncoder().encode("chunk"));
+          // no further enqueue, no close → upstream stall
+        },
+      });
+      return new Response(stream, { status: 200, headers: { "content-type": "video/mp4" } });
+    }) as unknown as FetchFn;
+    const app = await appWith(fetchFn, { PROXY_TIMEOUT_MS: "100" });
+    const tok = await tokenFor("https://v16.tiktokcdn.com/a.mp4");
+    const res = await app.request(`/v/${tok}`);
+    expect(res.status).toBe(200); // headers already sent
+    await expect(res.text()).rejects.toThrow(); // body errors after the idle timeout
+  });
+
   test("429 when the client IP exceeds the rate limit", async () => {
     const config = loadConfig({ PROXY_SECRET: SECRET, RATE_LIMIT_PER_MIN: "1" });
     const app = new Hono();

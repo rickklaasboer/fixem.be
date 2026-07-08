@@ -49,7 +49,12 @@ export function deobfuscateSnapsave(blob: string): string | null {
     let r = "";
     for (let i = 0, len = h.length; i < len; i++) {
       let s = "";
-      while (h[i] !== n[e]) {
+      // Bound by `len`: a well-formed blob ends every chunk with the delimiter
+      // n[e], but a truncated/format-changed third-party response may not — an
+      // unbounded `while (h[i] !== n[e])` would then walk past the end (h[i]
+      // undefined, never equal to a defined delimiter) and spin forever,
+      // blocking Bun's single event loop so the resolver timeout can't fire.
+      while (i < len && h[i] !== n[e]) {
         s += h[i];
         i++;
       }

@@ -1,6 +1,6 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
 import { truncate } from "../lib/text";
-import { CHROME_UA } from "../lib/http";
+import { CHROME_UA, withSignal } from "../lib/http";
 import { fetchSnapsaveMedia } from "./snapsave";
 
 const HOSTS = new Set(["instagram.com", "www.instagram.com", "ddinstagram.com"]);
@@ -207,13 +207,13 @@ export function createInstagramAdapter(
 ): PlatformAdapter {
   // Authenticated path: the mobile private API (needs a session cookie). Returns
   // null on any failure so resolve() can fall through to the other strategies.
-  async function fetchMobileMedia(code: string): Promise<MobileItem | null> {
+  async function fetchMobileMedia(f: FetchFn, code: string): Promise<MobileItem | null> {
     if (!cfg.cookie) return null;
     const mediaId = shortcodeToMediaId(code);
     if (!mediaId) return null;
     try {
       const csrf = cfg.cookie.match(/csrftoken=([^;]+)/)?.[1] ?? "";
-      const res = await fetchFn(`${MOBILE_API}/${mediaId}/info/`, {
+      const res = await f(`${MOBILE_API}/${mediaId}/info/`, {
         headers: {
           "User-Agent": "Instagram 269.0.0.18.75 Android",
           "X-IG-App-ID": cfg.appId,
@@ -234,7 +234,7 @@ export function createInstagramAdapter(
   // reachable-but-empty outcome — login wall (status:"fail" / require_login),
   // a non-JSON HTML wall, missing media, or a thrown/failed transport. We prefer
   // degrade-to-informative-link over throwing wherever Instagram is reachable.
-  async function fetchMedia(code: string): Promise<ShortcodeMedia | null> {
+  async function fetchMedia(f: FetchFn, code: string): Promise<ShortcodeMedia | null> {
     // proxyUrl offload hook: if set, route the request through it by prepending
     // the prefix + encoded target. A full residential-proxy client (auth, CONNECT
     // tunneling) is out of scope — this is the minimal wiring point.
@@ -257,7 +257,7 @@ export function createInstagramAdapter(
         const csrf = cfg.cookie.match(/csrftoken=([^;]+)/)?.[1];
         if (csrf) headers["X-CSRFToken"] = csrf;
       }
-      const res = await fetchFn(requestUrl, {
+      const res = await f(requestUrl, {
         method: "POST",
         headers,
         body: new URLSearchParams({
@@ -293,24 +293,25 @@ export function createInstagramAdapter(
       // canonical form keeps the cache key stable across URL variants.
       return code ? `https://www.instagram.com/p/${code}` : url.href;
     },
-    async resolve(url): Promise<EmbedMetadata> {
+    async resolve(url, signal): Promise<EmbedMetadata> {
+      const f = withSignal(fetchFn, signal);
       const code = codeOf(url);
       if (!code) throw new Error("instagram: not a post URL");
       const canonical = `https://www.instagram.com/p/${code}`;
 
       // Preferred authenticated path: the mobile private API (stable, no doc_id).
       if (cfg.cookie) {
-        const mobile = await fetchMobileMedia(code);
+        const mobile = await fetchMobileMedia(f, code);
         if (mobile) return metaFromMobile(mobile, canonical);
       }
 
-      const media = await fetchMedia(code);
+      const media = await fetchMedia(f, code);
       if (!media) {
         // Login-walled → optional snapsave.app fallback (third-party) before the
         // informative degrade. rapidcdn media links are Discord-fetchable directly,
         // so no /v/ proxy and no proxyHeaders.
         if (cfg.snapsave) {
-          const snap = await fetchSnapsaveMedia(canonical, fetchFn);
+          const snap = await fetchSnapsaveMedia(canonical, f);
           if (snap) {
             return {
               kind: snap.kind,

@@ -1,6 +1,6 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
 import { truncate } from "../lib/text";
-import { PLATFORM_UA, CHROME_UA } from "../lib/http";
+import { PLATFORM_UA, CHROME_UA, withSignal } from "../lib/http";
 
 const HOSTS = new Set([
   "reddit.com",
@@ -26,11 +26,14 @@ interface RedditCreds {
 
 // App-only (client_credentials) token manager. State lives in the closure, so
 // each adapter instance caches its own token.
-function createTokenManager(fetchFn: FetchFn, creds: RedditCreds): () => Promise<string> {
+function createTokenManager(
+  fetchFn: FetchFn,
+  creds: RedditCreds,
+): (signal?: AbortSignal) => Promise<string> {
   let cached: { token: string; expiresAt: number } | undefined;
-  return async () => {
+  return async (signal) => {
     if (cached && Date.now() < cached.expiresAt - TOKEN_REFRESH_MARGIN_MS) return cached.token;
-    const res = await fetchFn(TOKEN_URL, {
+    const res = await withSignal(fetchFn, signal)(TOKEN_URL, {
       method: "POST",
       headers: {
         Authorization: `Basic ${btoa(`${creds.clientId}:${creds.clientSecret}`)}`,
@@ -197,7 +200,8 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch, creds?: RedditCred
       // Stays sync/net-free by design: share links cache under their share-URL canonical.
       return `https://www.reddit.com${url.pathname.replace(/\/$/, "")}`;
     },
-    async resolve(url): Promise<EmbedMetadata> {
+    async resolve(url, signal): Promise<EmbedMetadata> {
+      const f = withSignal(fetchFn, signal);
       let canonical = this.canonicalize(url);
       if (SHARE_RE.test(url.pathname)) {
         // The .json endpoint 307s share links to a non-JSON target, so follow
@@ -206,8 +210,8 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch, creds?: RedditCred
         // same networks OAuth exists for, so share links would otherwise never
         // resolve with credentials set.
         const shareHeaders: Record<string, string> = { "User-Agent": PLATFORM_UA };
-        if (getToken) shareHeaders.Authorization = `bearer ${await getToken()}`;
-        const redirect = await fetchFn(canonical, {
+        if (getToken) shareHeaders.Authorization = `bearer ${await getToken(signal)}`;
+        const redirect = await f(canonical, {
           headers: shareHeaders,
           redirect: "manual",
         });
@@ -224,7 +228,7 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch, creds?: RedditCred
       // anonymous `.json` API is globally disabled (403 + web-app shell), and
       // OAuth creds are approval-gated, so this is the working no-auth path.
       if (!getToken) {
-        const htmlRes = await fetchFn(`https://old.reddit.com${new URL(canonical).pathname}`, {
+        const htmlRes = await f(`https://old.reddit.com${new URL(canonical).pathname}`, {
           headers: { "User-Agent": CHROME_UA, Accept: "text/html" },
         });
         if (!htmlRes.ok) throw new Error(`reddit ${htmlRes.status}`);
@@ -233,8 +237,8 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch, creds?: RedditCred
 
       // With credentials, hit oauth.reddit.com for the full JSON (richest —
       // includes muxed video, galleries, crosspost media). Canonical stays www.
-      const res = await fetchFn(`https://oauth.reddit.com${new URL(canonical).pathname}.json?raw_json=1`, {
-        headers: { Authorization: `bearer ${await getToken()}`, "User-Agent": PLATFORM_UA },
+      const res = await f(`https://oauth.reddit.com${new URL(canonical).pathname}.json?raw_json=1`, {
+        headers: { Authorization: `bearer ${await getToken(signal)}`, "User-Agent": PLATFORM_UA },
       });
       if (!res.ok) throw new Error(`reddit ${res.status}`);
       const json = (await res.json()) as [{ data: { children: { data: RedditPost }[] } }, unknown];

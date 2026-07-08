@@ -1,7 +1,19 @@
+import type { FetchFn } from "../adapters/types";
+
 // Shared outbound User-Agent for all platform API/redirect requests. A single
 // honest identifier (with a contact URL) keeps upstreams from rate-limiting us
 // as an anonymous scraper and avoids drift between adapters.
 export const PLATFORM_UA = "fixem.be/1.0 (embed fixer; +https://fixem.be)";
+
+// Bind an AbortSignal onto a fetchFn so every request an adapter makes during
+// one resolve is cancellable. The resolver aborts on its per-resolve timeout,
+// so a hung upstream releases the socket instead of orphaning it. Returns the
+// original fetchFn unchanged when there is no signal (tests inject their own
+// fetchFn and pass none — this keeps their behavior identical).
+export function withSignal(fetchFn: FetchFn, signal?: AbortSignal): FetchFn {
+  if (!signal) return fetchFn;
+  return ((input, init) => fetchFn(input, { ...init, signal })) as FetchFn;
+}
 
 // A real desktop-browser UA. Meta (Threads/Instagram) rejects the honest
 // PLATFORM_UA on its anonymous web endpoints, and the signed cdninstagram media

@@ -1,6 +1,6 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
 import { truncate } from "../lib/text";
-import { CHROME_UA } from "../lib/http";
+import { CHROME_UA, withSignal } from "../lib/http";
 
 const MAIN_HOSTS = new Set(["tiktok.com", "www.tiktok.com", "m.tiktok.com"]);
 const SHORT_HOSTS = new Set(["vm.tiktok.com", "vt.tiktok.com"]);
@@ -114,11 +114,12 @@ export function createTiktokAdapter(
     canonicalize(url) {
       return isShortLink(url) ? url.href : canonicalFullPost(url);
     },
-    async resolve(url): Promise<EmbedMetadata> {
+    async resolve(url, signal): Promise<EmbedMetadata> {
+      const f = withSignal(fetchFn, signal);
       // Short links resolve to the real post via a manual redirect probe.
       let pageUrl: string;
       if (isShortLink(url)) {
-        const probe = await fetchFn(url.href, {
+        const probe = await f(url.href, {
           headers: { "User-Agent": CHROME_UA },
           redirect: "manual",
         });
@@ -129,7 +130,7 @@ export function createTiktokAdapter(
         pageUrl = canonicalFullPost(url);
       }
 
-      const res = await fetchFn(pageUrl, { headers: { "User-Agent": CHROME_UA } });
+      const res = await f(pageUrl, { headers: { "User-Agent": CHROME_UA } });
       if (!res.ok) throw new Error(`tiktok ${res.status}`);
       const cookie = cookieHeaderFrom(res);
       const { statusCode, itemStruct } = extractItemDetail(await res.text());

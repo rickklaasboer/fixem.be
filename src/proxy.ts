@@ -40,6 +40,54 @@ function byteCeiling(maxBytes: number): TransformStream<Uint8Array, Uint8Array> 
   });
 }
 
+// Wrap the (byte-ceilinged) upstream body so a slot is released exactly once
+// when the transfer actually ends — normal close, upstream error, byte-ceiling
+// trip, or client disconnect (stream cancel) — and so a stalled upstream is
+// aborted. The handler returns a *lazy* streaming Response, so the concurrency
+// slot must be released here (at end-of-transfer), not in the handler's finally
+// (which runs the instant the Response is built, before a body byte flows).
+// onEnd is idempotent.
+function streamProxyBody(
+  source: ReadableStream<Uint8Array>,
+  onEnd: () => void,
+  onStall: () => void,
+  idleMs: number,
+): ReadableStream<Uint8Array> {
+  const reader = source.getReader();
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const read = reader.read();
+        // Idle-read watchdog: an upstream that sent headers then went quiet must
+        // not pin this slot forever. The timer runs only while we're actively
+        // awaiting a chunk the client has already asked for, so a merely slow
+        // *client* (not pulling) never trips it — only a stalled *upstream*.
+        const idle = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("proxy idle timeout")), idleMs);
+        });
+        const { done, value } = await Promise.race([read, idle]);
+        if (done) {
+          onEnd();
+          controller.close();
+          return;
+        }
+        controller.enqueue(value);
+      } catch (err) {
+        onStall(); // abort the upstream fetch (no-op if it already ended)
+        onEnd();
+        controller.error(err);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    },
+    cancel(reason) {
+      onEnd();
+      return reader.cancel(reason);
+    },
+  });
+}
+
 // Declared total size from Content-Length (200) or the "/<total>" of a
 // Content-Range (206), or null when unknown (chunked / unsatisfiable).
 function declaredLength(res: Response): number | null {
@@ -92,6 +140,17 @@ export function mountProxy(
 
     if (inflight >= config.proxyMaxConcurrent) return c.text("busy", 503);
     inflight++;
+    // Release the concurrency slot exactly once. On the streaming success path
+    // the body outlives this handler, so its slot is released at end-of-transfer
+    // by releaseOnEnd; every other path releases it in the finally below.
+    let released = false;
+    const release = () => {
+      if (!released) {
+        released = true;
+        inflight--;
+      }
+    };
+    let streaming = false;
     // Timeout the connect/header phase only — a slow first byte fails fast, but
     // a healthy large stream is not killed mid-body. The byteCeiling bounds size.
     const abort = new AbortController();
@@ -147,14 +206,25 @@ export function mountProxy(
       }
       h.set("accept-ranges", "bytes");
       h.set("cache-control", "public, max-age=3600");
-      const body = up.body ? up.body.pipeThrough(byteCeiling(config.proxyMaxBytes)) : null;
+      if (!up.body) return new Response(null, { status: up.status, headers: h });
+      // Hold the concurrency slot until the body finishes streaming — otherwise
+      // the counter only bounds the momentary header phase and proxyMaxConcurrent
+      // caps nothing (a valid token could then fan out unlimited concurrent
+      // large-file streams). The finally must NOT also release it.
+      streaming = true;
+      const body = streamProxyBody(
+        up.body.pipeThrough(byteCeiling(config.proxyMaxBytes)),
+        release,
+        () => abort.abort(),
+        config.proxyTimeoutMs,
+      );
       return new Response(body, { status: up.status, headers: h });
     } catch (err) {
       logger.warn({ host: target.hostname, err: String(err) }, "proxy fetch failed");
       return c.text("bad gateway", 502);
     } finally {
       clearTimeout(timer);
-      inflight--;
+      if (!streaming) release();
     }
   });
 }

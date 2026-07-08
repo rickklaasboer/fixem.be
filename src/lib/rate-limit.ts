@@ -18,7 +18,8 @@ export class MemoryRateLimitStore implements RateLimitStore {
 
 // Sliding window over a Redis sorted set. Fail-open: if Redis is down,
 // rate limiting is disabled rather than blocking traffic.
-class RedisRateLimitStore implements RateLimitStore {
+// Exported for tests to exercise the fail-open path with a stubbed client.
+export class RedisRateLimitStore implements RateLimitStore {
   constructor(private readonly client: RedisClient) {}
 
   async hit(key: string, windowMs: number, now: number): Promise<number> {

@@ -88,6 +88,21 @@ describe("Resolver", () => {
     if (out.status === "degraded") expect(out.reason).toBe("timeout");
   });
 
+  test("aborts the resolve signal on timeout so adapters can cancel in-flight fetches", async () => {
+    let captured: AbortSignal | undefined;
+    const { adapter } = fakeAdapter({
+      resolve: (_url, signal) =>
+        new Promise(() => {
+          captured = signal; // adapter would thread this into fetch via withSignal
+        }),
+    });
+    const r = makeResolver(adapter, { timeoutMs: 20 });
+    const out = await r.resolve(new URL("https://fake.test/p"));
+    expect(out.status).toBe("degraded");
+    expect(captured).toBeDefined();
+    expect(captured?.aborted).toBe(true); // timeout fired → in-flight work is cancelled
+  });
+
   test("breaker opens after threshold and skips adapter during cooldown", async () => {
     let calls = 0;
     let t = 1_000_000;

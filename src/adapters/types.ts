@@ -28,5 +28,8 @@ export interface PlatformAdapter {
   name: string;
   match(url: URL): boolean;
   canonicalize(url: URL): string;
-  resolve(url: URL): Promise<EmbedMetadata>;
+  // `signal` (when the resolver supplies one) aborts every in-flight fetch this
+  // resolve makes if the per-resolve timeout fires — adapters thread it into
+  // their fetch calls via withSignal(). Optional so simple adapters can ignore it.
+  resolve(url: URL, signal?: AbortSignal): Promise<EmbedMetadata>;
 }

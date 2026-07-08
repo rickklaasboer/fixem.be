@@ -1,6 +1,6 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
 import { truncate } from "../lib/text";
-import { PLATFORM_UA } from "../lib/http";
+import { PLATFORM_UA, withSignal } from "../lib/http";
 
 const API = "https://public.api.bsky.app/xrpc";
 const PATH_RE = /^\/profile\/([^/]+)\/post\/([^/]+)\/?$/;
@@ -53,7 +53,8 @@ export function createBlueskyAdapter(fetchFn: FetchFn = fetch): PlatformAdapter 
       const m = url.pathname.match(PATH_RE)!;
       return `https://bsky.app/profile/${m[1]}/post/${m[2]}`;
     },
-    async resolve(url): Promise<EmbedMetadata> {
+    async resolve(url, signal): Promise<EmbedMetadata> {
+      const f = withSignal(fetchFn, signal);
       const m = url.pathname.match(PATH_RE);
       if (!m) throw new Error("bluesky: not a post URL");
       const [, actor, rkey] = m;
@@ -61,7 +62,7 @@ export function createBlueskyAdapter(fetchFn: FetchFn = fetch): PlatformAdapter 
       let did = actor!;
       if (!did.startsWith("did:")) {
         const r = await getJson<{ did: string }>(
-          fetchFn,
+          f,
           `${API}/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(actor!)}`,
         );
         did = r.did;
@@ -69,12 +70,27 @@ export function createBlueskyAdapter(fetchFn: FetchFn = fetch): PlatformAdapter 
 
       const atUri = `at://${did}/app.bsky.feed.post/${rkey}`;
       const data = await getJson<BskyThreadResponse>(
-        fetchFn,
+        f,
         `${API}/app.bsky.feed.getPostThread?uri=${encodeURIComponent(atUri)}&depth=0`,
       );
       const post = data.thread?.post;
       if (!post || !data.thread?.$type?.endsWith("#threadViewPost")) {
-        throw new Error("bluesky: post unavailable");
+        // getPostThread returns 200 with a #notFoundPost / #blockedPost union
+        // (no `post`) for deleted/blocked posts. That's reachable-but-refused, so
+        // return an informative branded card rather than throwing to a generic
+        // degrade — mirroring the Twitter tombstone path.
+        const blocked = data.thread?.$type?.endsWith("#blockedPost") ?? false;
+        return {
+          kind: "link",
+          title: blocked ? "Blocked post" : "Post unavailable",
+          description: blocked
+            ? "This Bluesky post is from a blocked account and can't be shown."
+            : "This Bluesky post is unavailable — it may have been deleted.",
+          siteName: "Bluesky",
+          themeColor: "#1185FE",
+          ttlSeconds: 600,
+          originalUrl: this.canonicalize(url),
+        };
       }
 
       const { handle, displayName } = post.author;

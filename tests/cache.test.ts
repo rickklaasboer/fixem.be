@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { MemoryCache } from "../src/lib/cache";
+import type { RedisClient } from "bun";
+import { MemoryCache, RedisCache } from "../src/lib/cache";
+
+// A RedisClient whose every command rejects — stands in for an unreachable
+// Redis (enableOfflineQueue:false rejects immediately in production).
+const downClient = { send: async () => { throw new Error("redis down"); } } as unknown as RedisClient;
 
 describe("MemoryCache", () => {
   test("set/get roundtrip", async () => {
@@ -21,5 +26,19 @@ describe("MemoryCache", () => {
 
   test("ping is true", async () => {
     expect(await new MemoryCache().ping()).toBe(true);
+  });
+});
+
+describe("RedisCache fail-open (spec §4: a Redis outage never breaks a request)", () => {
+  test("get returns null instead of throwing", async () => {
+    expect(await new RedisCache(downClient).get("k")).toBeNull();
+  });
+
+  test("setEx resolves instead of throwing", async () => {
+    await expect(new RedisCache(downClient).setEx("k", 60, "v")).resolves.toBeUndefined();
+  });
+
+  test("ping returns false instead of throwing", async () => {
+    expect(await new RedisCache(downClient).ping()).toBe(false);
   });
 });

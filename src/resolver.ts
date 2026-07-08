@@ -19,9 +19,12 @@ export interface ResolverOptions {
   now?: () => number;
 }
 
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+function withTimeout<T>(p: Promise<T>, ms: number, onTimeout?: () => void): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error("timeout")), ms);
+    const t = setTimeout(() => {
+      onTimeout?.();
+      reject(new Error("timeout"));
+    }, ms);
     p.then(
       (v) => {
         clearTimeout(t);
@@ -115,8 +118,15 @@ export class Resolver {
   ): Promise<ResolveOutcome> {
     const adapter = this.opts.registry.find(url)!;
     const started = this.now();
+    // Abort the adapter's in-flight fetches when the timeout fires, so a hung
+    // upstream releases its socket instead of running on orphaned past our reply.
+    const abort = new AbortController();
     try {
-      const meta = await withTimeout(adapter.resolve(url), this.opts.timeoutMs);
+      const meta = await withTimeout(
+        adapter.resolve(url, abort.signal),
+        this.opts.timeoutMs,
+        () => abort.abort(),
+      );
       this.failures.delete(platform);
       const ttl = Math.min(meta.ttlSeconds ?? this.opts.ttlSeconds, this.opts.ttlSeconds);
       await this.opts.cache.setEx(key, ttl, JSON.stringify(meta));

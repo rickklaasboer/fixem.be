@@ -159,6 +159,22 @@ describe("routes", () => {
     expect(await res.text()).toContain('content="https://broken.test/post/1"');
     expect(res.headers.get("Cache-Control")).toBe("no-store");
   });
+
+  test("a well-formed URL never 500s even if the handler itself throws (onError guard)", async () => {
+    // resolve() is guaranteed never to throw, so to reach the app-level onError
+    // last-resort guard we inject a resolver that does throw. The invariant:
+    // a well-formed wrapped URL degrades to a 302, never a 500.
+    const throwingResolver = {
+      canonicalFor: () => null,
+      resolve: async () => {
+        throw new Error("boom");
+      },
+    } as unknown as Resolver;
+    const app = makeApp({ resolver: throwingResolver });
+    const res = await get(app, "/https://example.com/hello", DISCORD_UA);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("https://example.com/hello");
+  });
 });
 
 test("reddit URL routes through app with fixture-backed adapter", async () => {

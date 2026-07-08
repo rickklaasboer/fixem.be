@@ -35,7 +35,8 @@ export class MemoryCache implements MetadataCache {
 
 // Redis-backed cache. Every operation is best-effort: a Redis outage must
 // degrade to cache-less resolution, never break a request (spec §4).
-class RedisCache implements MetadataCache {
+// Exported for tests to exercise the fail-open path with a stubbed client.
+export class RedisCache implements MetadataCache {
   constructor(private readonly client: RedisClient) {}
 
   async get(key: string): Promise<string | null> {

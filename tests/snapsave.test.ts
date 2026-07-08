@@ -28,6 +28,15 @@ describe("snapsave decoder", () => {
     expect(deobfuscateSnapsave("garbage")).toBeNull();
   });
 
+  test("terminates on a decoder blob whose data never hits the delimiter (no infinite loop)", () => {
+    // Matches the outer regex so we enter the decode loop, but h="ABC" never
+    // contains the delimiter n[e] = "Y" (n="XY", e=1). Before the `i < len`
+    // bound this spun the event loop forever; now it must just return quickly.
+    // If this ever regresses, the whole test run hangs on the bun timeout.
+    expect(deobfuscateSnapsave('}("ABC",2,"XY",5,1,3)')).toBeNull();
+    expect(parseSnapsave('}("ABC",2,"XY",5,1,3)')).toBeNull();
+  });
+
   test("fetchSnapsaveMedia POSTs the IG url and parses the response", async () => {
     let seenBody: string | undefined;
     const fetchFn = (async (_input: unknown, init?: RequestInit) => {

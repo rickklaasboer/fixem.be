@@ -79,11 +79,26 @@ describe("bluesky adapter", () => {
     expect(m.description).toBe("Good read. 🔗 How embeds work");
   });
 
-  test("not-found thread throws", async () => {
+  test("not-found post returns an informative Bluesky card (not a throw)", async () => {
     const ad = createBlueskyAdapter(
       fakeFetch({ thread: { $type: "app.bsky.feed.defs#notFoundPost", notFound: true } }),
     );
-    expect(ad.resolve(POST_URL)).rejects.toThrow();
+    const m = await ad.resolve(POST_URL);
+    expect(m.kind).toBe("link");
+    expect(m.siteName).toBe("Bluesky");
+    expect(m.themeColor).toBe("#1185FE");
+    expect(m.title).toBe("Post unavailable");
+    expect(m.originalUrl).toBe("https://bsky.app/profile/alice.bsky.social/post/3kabc");
+  });
+
+  test("blocked post returns a branded blocked card", async () => {
+    const ad = createBlueskyAdapter(
+      fakeFetch({ thread: { $type: "app.bsky.feed.defs#blockedPost", blocked: true } }),
+    );
+    const m = await ad.resolve(POST_URL);
+    expect(m.kind).toBe("link");
+    expect(m.title).toBe("Blocked post");
+    expect(m.siteName).toBe("Bluesky");
   });
 
   test("content labels map to nsfw", async () => {

@@ -37,18 +37,18 @@ interface ResolverOverrides {
     cache?: Cache;
     ttlSeconds?: number;
     timeoutMs?: number;
-    breakerThreshold?: number;
-    breakerCooldownMs?: number;
     now?: () => number;
 }
+
+// Resolver's breaker knobs are internal constants: threshold 5, cooldown 60s.
+const BREAKER_THRESHOLD = 5;
+const BREAKER_COOLDOWN_MS = 60_000;
 
 function makeResolver(adapter: PlatformAdapter, opts: ResolverOverrides = {}) {
     const {
         cache = new MemoryCache(),
         ttlSeconds = 3600,
         timeoutMs = 200,
-        breakerThreshold,
-        breakerCooldownMs,
         now,
     } = opts;
     const clock = {now: now ?? Date.now} as Clock;
@@ -57,17 +57,7 @@ function makeResolver(adapter: PlatformAdapter, opts: ResolverOverrides = {}) {
         resolveTimeoutMs: timeoutMs,
     } as unknown as Config;
     const registry = new AdapterRegistry([adapter]);
-    return breakerThreshold === undefined && breakerCooldownMs === undefined
-        ? new Resolver(registry, cache, silent, clock, config)
-        : new Resolver(
-              registry,
-              cache,
-              silent,
-              clock,
-              config,
-              breakerThreshold ?? 5,
-              breakerCooldownMs ?? 60_000,
-          );
+    return new Resolver(registry, cache, silent, clock, config);
 }
 
 describe('Resolver', () => {
@@ -144,21 +134,18 @@ describe('Resolver', () => {
                 throw new Error('boom');
             },
         });
-        const r = makeResolver(adapter, {
-            breakerThreshold: 2,
-            breakerCooldownMs: 60_000,
-            now: () => t,
-        });
-        await r.resolve(new URL('https://fake.test/p'));
-        await r.resolve(new URL('https://fake.test/p'));
-        expect(calls).toBe(2);
+        const r = makeResolver(adapter, {now: () => t});
+        for (let i = 0; i < BREAKER_THRESHOLD; i++) {
+            await r.resolve(new URL('https://fake.test/p'));
+        }
+        expect(calls).toBe(BREAKER_THRESHOLD);
         const out = await r.resolve(new URL('https://fake.test/p'));
         expect(out.status).toBe('degraded');
         if (out.status === 'degraded') expect(out.reason).toBe('breaker-open');
-        expect(calls).toBe(2); // adapter not called while open
-        t += 60_001; // cooldown elapsed → adapter tried again
+        expect(calls).toBe(BREAKER_THRESHOLD); // adapter not called while open
+        t += BREAKER_COOLDOWN_MS + 1; // cooldown elapsed → adapter tried again
         await r.resolve(new URL('https://fake.test/p'));
-        expect(calls).toBe(3);
+        expect(calls).toBe(BREAKER_THRESHOLD + 1);
     });
 
     test('cached entries are served even while breaker is open', async () => {
@@ -169,11 +156,12 @@ describe('Resolver', () => {
                 return META;
             },
         });
-        const r = makeResolver(adapter, {breakerThreshold: 2});
+        const r = makeResolver(adapter);
         await r.resolve(new URL('https://fake.test/p')); // now cached
         fail = true;
-        await r.resolve(new URL('https://fake.test/q'));
-        await r.resolve(new URL('https://fake.test/q')); // breaker opens
+        for (let i = 0; i < BREAKER_THRESHOLD; i++) {
+            await r.resolve(new URL('https://fake.test/q')); // breaker opens
+        }
         const hit = await r.resolve(new URL('https://fake.test/p'));
         expect(hit.status).toBe('ok');
         if (hit.status === 'ok') expect(hit.cacheHit).toBe(true);

@@ -10,9 +10,7 @@ import Cache from '@/services/cache/Cache';
 import RedisCache from '@/services/cache/RedisCache';
 import RateLimitStore from '@/services/rate-limit/RateLimitStore';
 import RedisRateLimitStore from '@/services/rate-limit/RedisRateLimitStore';
-import Clock from '@/services/Clock';
 import AdapterRegistry from '@/domain/AdapterRegistry';
-import Resolver from '@/domain/Resolver';
 import RedditAdapter from '@/adapters/RedditAdapter';
 import BlueskyAdapter from '@/adapters/BlueskyAdapter';
 import TwitterAdapter from '@/adapters/TwitterAdapter';
@@ -88,21 +86,6 @@ export default function bootstrap(): Hono {
         );
     }
     container.registerInstance(AdapterRegistry, new AdapterRegistry(adapters));
-
-    // Resolver's two trailing constructor params (breakerThreshold,
-    // breakerCooldownMs) carry defaults, so tsyringe would try to inject them
-    // as `Number` and throw. Build it from its resolved deps (keeping those
-    // defaults) and register the instance so controllers can inject it.
-    container.registerInstance(
-        Resolver,
-        new Resolver(
-            app(AdapterRegistry),
-            app(cacheToken),
-            app(Logger),
-            app(Clock),
-            app(Config),
-        ),
-    );
 
     const server = new Hono();
     routes(server);

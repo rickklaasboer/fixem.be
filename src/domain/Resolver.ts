@@ -37,6 +37,10 @@ export default class Resolver {
         string,
         {count: number; openUntil: number}
     >();
+    // Circuit-breaker tuning. Constants (never env-configurable in prod); tests
+    // exercise them at their real values rather than overriding the constructor.
+    private readonly breakerThreshold = 5;
+    private readonly breakerCooldownMs = 60_000;
 
     constructor(
         private registry: AdapterRegistry,
@@ -44,11 +48,11 @@ export default class Resolver {
         private logger: Logger,
         private clock: Clock,
         private config: Config,
-        private readonly breakerThreshold: number = 5,
-        private readonly breakerCooldownMs: number = 60_000,
     ) {}
 
-    canonicalFor(url: URL): {canonicalUrl: string; platform: string} | null {
+    public canonicalFor(
+        url: URL,
+    ): {canonicalUrl: string; platform: string} | null {
         try {
             const adapter = this.registry.find(url);
             if (!adapter) return null;
@@ -64,7 +68,7 @@ export default class Resolver {
 
     // Top-level guard: the "failures degrade, never throw" invariant must hold
     // even if an adapter's match()/canonicalize() or the cache itself throws.
-    async resolve(url: URL): Promise<ResolveOutcome> {
+    public async resolve(url: URL): Promise<ResolveOutcome> {
         try {
             return await this.resolveInner(url);
         } catch (err) {

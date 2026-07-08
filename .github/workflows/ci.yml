@@ -54,7 +54,14 @@ jobs:
       - name: release-it
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bunx release-it --ci
+        run: |
+          # First release (no tag yet) is pinned to 1.0.0; every run after
+          # auto-bumps from the conventional commits since the last tag.
+          if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+            bunx release-it --ci
+          else
+            bunx release-it 1.0.0 --ci
+          fi
       - name: Capture released version
         id: out
         run: echo "version=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"

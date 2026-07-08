@@ -1,17 +1,26 @@
 {
-  "name": "fixem-be",
-  "private": true,
-  "type": "module",
-  "license": "AGPL-3.0-or-later",
-  "scripts": {
-    "dev": "bun --watch src/index.ts",
-    "start": "bun src/index.ts",
-    "test": "bun test"
-  },
-  "dependencies": {
-    "hono": "^4.6.0"
-  },
-  "devDependencies": {
-    "@types/bun": "^1.2.0"
-  }
+    "name": "fixem-be",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "license": "AGPL-3.0-or-later",
+    "scripts": {
+        "dev": "bun --watch src/index.ts",
+        "start": "bun src/index.ts",
+        "test": "bun test",
+        "typecheck": "tsc --noEmit",
+        "lint": "biome check",
+        "lint:fix": "biome check --write",
+        "format": "biome format --write",
+        "release": "release-it"
+    },
+    "dependencies": {
+        "hono": "^4.6.0"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.5.3",
+        "@release-it/conventional-changelog": "^11.0.1",
+        "@types/bun": "^1.2.0",
+        "release-it": "^20.2.1"
+    }
 }

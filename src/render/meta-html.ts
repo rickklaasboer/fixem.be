@@ -1,22 +1,27 @@
-import type { EmbedMetadata } from "../adapters/types";
+import type {EmbedMetadata} from '../adapters/types';
 
 function esc(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+    return s
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
 }
 
-function tag(kind: "property" | "name", key: string, value: string | number): string {
-  return `<meta ${kind}="${key}" content="${esc(String(value))}">`;
+function tag(
+    kind: 'property' | 'name',
+    key: string,
+    value: string | number,
+): string {
+    return `<meta ${kind}="${key}" content="${esc(String(value))}">`;
 }
 
 // Preview-only diagnostic for a URL that no adapter matched. A crawler gets a
 // bare 302 for these (no embed to build), which is invisible when you prepend
 // /preview/ to debug — so instead of silently redirecting, explain why.
-const SUPPORTED = "Reddit · Bluesky · X (Twitter) · Threads · Instagram · TikTok · Twitch clips";
+const SUPPORTED =
+    'Reddit · Bluesky · X (Twitter) · Threads · Instagram · TikTok · Twitch clips';
 
 // Shared webfont setup for the human-facing /preview/ pages (matches the
 // landing page). The crawler-facing redirect page stays external-font-free.
@@ -27,7 +32,7 @@ const SANS = `"DM Sans",system-ui,sans-serif`;
 const TITLE_FONT = `"Montserrat",sans-serif`;
 const MONO = `ui-monospace,"JetBrains Mono",monospace`;
 export function renderPreviewNoAdapter(targetUrl: string): string {
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -60,51 +65,74 @@ a{color:#5058e0;text-decoration:none}a:hover{text-decoration:underline}
 </html>`;
 }
 
-function dims(m: { width?: number; height?: number }): string {
-  return m.width && m.height ? ` (${m.width}×${m.height})` : "";
+function dims(m: {width?: number; height?: number}): string {
+    return m.width && m.height ? ` (${m.width}×${m.height})` : '';
 }
 
 // Rich debug view for /preview/ on a MATCHED url: the resolution outcome,
 // a visual embed card, the parsed metadata, and the exact crawler HTML Discord
 // would receive. Not crawler-facing — humans only reach it via /preview/.
 export function renderPreviewReport(opts: {
-  platform: string;
-  status: "ok" | "degraded";
-  cacheHit?: boolean;
-  reason?: string;
-  canonicalUrl: string;
-  meta: EmbedMetadata;
-  oembedUrl: string;
+    platform: string;
+    status: 'ok' | 'degraded';
+    cacheHit?: boolean;
+    reason?: string;
+    canonicalUrl: string;
+    meta: EmbedMetadata;
+    oembedUrl: string;
 }): string {
-  const { meta } = opts;
-  const accent = meta.themeColor || "#5058e0";
-  const crawlerHtml = renderMetaHtml(meta, { oembedUrl: opts.oembedUrl, refresh: false });
-  const statusLabel =
-    opts.status === "ok" ? `ok · cache ${opts.cacheHit ? "hit" : "miss"}` : `degraded · ${opts.reason ?? "error"}`;
-  const statusClass = opts.status === "ok" ? "ok" : "warn";
+    const {meta} = opts;
+    const accent = meta.themeColor || '#5058e0';
+    const crawlerHtml = renderMetaHtml(meta, {
+        oembedUrl: opts.oembedUrl,
+        refresh: false,
+    });
+    const statusLabel =
+        opts.status === 'ok'
+            ? `ok · cache ${opts.cacheHit ? 'hit' : 'miss'}`
+            : `degraded · ${opts.reason ?? 'error'}`;
+    const statusClass = opts.status === 'ok' ? 'ok' : 'warn';
 
-  const rows: [string, string][] = [["kind", meta.kind], ["title", meta.title]];
-  if (meta.description) rows.push(["description", meta.description]);
-  if (meta.author) rows.push(["author", meta.author.url ? `${meta.author.name} — ${meta.author.url}` : meta.author.name]);
-  rows.push(["siteName", meta.siteName]);
-  if (meta.themeColor) rows.push(["themeColor", meta.themeColor]);
-  if (meta.image) rows.push(["image", `${meta.image.url}${dims(meta.image)}`]);
-  if (meta.video) {
-    const proxied = meta.video.url.includes("/v/") ? " · proxied via /v/" : "";
-    rows.push(["video", `${meta.video.url}${dims(meta.video)} · ${meta.video.mimeType}${proxied}`]);
-  }
-  rows.push(["nsfw", String(meta.nsfw ?? false)]);
-  if (meta.ttlSeconds !== undefined) rows.push(["ttlSeconds", String(meta.ttlSeconds)]);
-  rows.push(["originalUrl", meta.originalUrl]);
-  const fieldRows = rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join("\n");
+    const rows: [string, string][] = [
+        ['kind', meta.kind],
+        ['title', meta.title],
+    ];
+    if (meta.description) rows.push(['description', meta.description]);
+    if (meta.author)
+        rows.push([
+            'author',
+            meta.author.url
+                ? `${meta.author.name} — ${meta.author.url}`
+                : meta.author.name,
+        ]);
+    rows.push(['siteName', meta.siteName]);
+    if (meta.themeColor) rows.push(['themeColor', meta.themeColor]);
+    if (meta.image)
+        rows.push(['image', `${meta.image.url}${dims(meta.image)}`]);
+    if (meta.video) {
+        const proxied = meta.video.url.includes('/v/')
+            ? ' · proxied via /v/'
+            : '';
+        rows.push([
+            'video',
+            `${meta.video.url}${dims(meta.video)} · ${meta.video.mimeType}${proxied}`,
+        ]);
+    }
+    rows.push(['nsfw', String(meta.nsfw ?? false)]);
+    if (meta.ttlSeconds !== undefined)
+        rows.push(['ttlSeconds', String(meta.ttlSeconds)]);
+    rows.push(['originalUrl', meta.originalUrl]);
+    const fieldRows = rows
+        .map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`)
+        .join('\n');
 
-  const media = meta.video
-    ? `<video class="media" controls preload="metadata" src="${esc(meta.video.url)}"${meta.image ? ` poster="${esc(meta.image.url)}"` : ""}></video>`
-    : meta.image
-      ? `<img class="media" src="${esc(meta.image.url)}" alt="" loading="lazy">`
-      : `<div class="nomedia">no image / video — link-only embed</div>`;
+    const media = meta.video
+        ? `<video class="media" controls preload="metadata" src="${esc(meta.video.url)}"${meta.image ? ` poster="${esc(meta.image.url)}"` : ''}></video>`
+        : meta.image
+          ? `<img class="media" src="${esc(meta.image.url)}" alt="" loading="lazy">`
+          : `<div class="nomedia">no image / video — link-only embed</div>`;
 
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -144,9 +172,9 @@ pre{background:#fff;border:1px solid #e2e2dd;border-radius:8px;padding:12px 14px
 
 <h2>Embed card</h2>
 <div class="card">
-<div class="site">${esc(meta.siteName)}${meta.nsfw ? " · 🔞 NSFW" : ""}</div>
+<div class="site">${esc(meta.siteName)}${meta.nsfw ? ' · 🔞 NSFW' : ''}</div>
 <div class="ctitle">${esc(meta.title)}</div>
-${meta.description ? `<div class="cdesc">${esc(meta.description)}</div>` : ""}
+${meta.description ? `<div class="cdesc">${esc(meta.description)}</div>` : ''}
 ${media}
 </div>
 
@@ -169,76 +197,80 @@ ${fieldRows}
 }
 
 export function minimalMeta(canonicalUrl: string): EmbedMetadata {
-  return {
-    kind: "link",
-    title: canonicalUrl,
-    siteName: "fixem.be",
-    originalUrl: canonicalUrl,
-  };
+    return {
+        kind: 'link',
+        title: canonicalUrl,
+        siteName: 'fixem.be',
+        originalUrl: canonicalUrl,
+    };
 }
 
 export function renderMetaHtml(
-  meta: EmbedMetadata,
-  opts: { oembedUrl: string; refresh?: boolean },
+    meta: EmbedMetadata,
+    opts: {oembedUrl: string; refresh?: boolean},
 ): string {
-  const refresh = opts.refresh ?? true;
-  const title = `${meta.nsfw ? "🔞 " : ""}${meta.title}`;
-  const lines: string[] = [
-    tag("property", "og:title", title),
-    tag("property", "og:site_name", meta.siteName),
-    tag("property", "og:url", meta.originalUrl),
-  ];
-  if (meta.description) lines.push(tag("property", "og:description", meta.description));
-  if (meta.themeColor) lines.push(tag("name", "theme-color", meta.themeColor));
+    const refresh = opts.refresh ?? true;
+    const title = `${meta.nsfw ? '🔞 ' : ''}${meta.title}`;
+    const lines: string[] = [
+        tag('property', 'og:title', title),
+        tag('property', 'og:site_name', meta.siteName),
+        tag('property', 'og:url', meta.originalUrl),
+    ];
+    if (meta.description)
+        lines.push(tag('property', 'og:description', meta.description));
+    if (meta.themeColor)
+        lines.push(tag('name', 'theme-color', meta.themeColor));
 
-  if (meta.video) {
-    lines.push(
-      tag("property", "og:type", "video.other"),
-      tag("property", "og:video", meta.video.url),
-      tag("property", "og:video:secure_url", meta.video.url),
-      tag("property", "og:video:type", meta.video.mimeType),
-      tag("name", "twitter:card", "player"),
-      tag("name", "twitter:player:stream", meta.video.url),
-    );
-    if (meta.video.width) {
-      lines.push(
-        tag("property", "og:video:width", meta.video.width),
-        tag("name", "twitter:player:width", meta.video.width),
-      );
+    if (meta.video) {
+        lines.push(
+            tag('property', 'og:type', 'video.other'),
+            tag('property', 'og:video', meta.video.url),
+            tag('property', 'og:video:secure_url', meta.video.url),
+            tag('property', 'og:video:type', meta.video.mimeType),
+            tag('name', 'twitter:card', 'player'),
+            tag('name', 'twitter:player:stream', meta.video.url),
+        );
+        if (meta.video.width) {
+            lines.push(
+                tag('property', 'og:video:width', meta.video.width),
+                tag('name', 'twitter:player:width', meta.video.width),
+            );
+        }
+        if (meta.video.height) {
+            lines.push(
+                tag('property', 'og:video:height', meta.video.height),
+                tag('name', 'twitter:player:height', meta.video.height),
+            );
+        }
+    } else if (meta.image) {
+        lines.push(tag('name', 'twitter:card', 'summary_large_image'));
+    } else {
+        lines.push(tag('name', 'twitter:card', 'summary'));
     }
-    if (meta.video.height) {
-      lines.push(
-        tag("property", "og:video:height", meta.video.height),
-        tag("name", "twitter:player:height", meta.video.height),
-      );
+
+    if (meta.image) {
+        lines.push(
+            tag('property', 'og:image', meta.image.url),
+            tag('name', 'twitter:image', meta.image.url),
+        );
+        if (meta.image.width)
+            lines.push(tag('property', 'og:image:width', meta.image.width));
+        if (meta.image.height)
+            lines.push(tag('property', 'og:image:height', meta.image.height));
     }
-  } else if (meta.image) {
-    lines.push(tag("name", "twitter:card", "summary_large_image"));
-  } else {
-    lines.push(tag("name", "twitter:card", "summary"));
-  }
 
-  if (meta.image) {
-    lines.push(
-      tag("property", "og:image", meta.image.url),
-      tag("name", "twitter:image", meta.image.url),
-    );
-    if (meta.image.width) lines.push(tag("property", "og:image:width", meta.image.width));
-    if (meta.image.height) lines.push(tag("property", "og:image:height", meta.image.height));
-  }
-
-  // Body styling is self-contained (system monospace, no external font) — this
-  // page is crawler-facing; a human only sees it via /preview/ or if the
-  // meta-refresh fails. It echoes the fixem.be landing palette.
-  return `<!DOCTYPE html>
+    // Body styling is self-contained (system monospace, no external font) — this
+    // page is crawler-facing; a human only sees it via /preview/ or if the
+    // meta-refresh fails. It echoes the fixem.be landing palette.
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
-${lines.join("\n")}
+${lines.join('\n')}
 <link rel="alternate" type="application/json+oembed" href="${esc(opts.oembedUrl)}" title="${esc(meta.author?.name ?? meta.siteName)}">
-${refresh ? `<meta http-equiv="refresh" content="0;url=${esc(meta.originalUrl)}">\n` : ""}<style>
+${refresh ? `<meta http-equiv="refresh" content="0;url=${esc(meta.originalUrl)}">\n` : ''}<style>
 :root{color-scheme:light}
 body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:24px;background:#f7f7f5;color:#6a6d78;font:14px/1.6 ui-monospace,"JetBrains Mono",monospace}
 a{color:#5058e0;text-decoration:none}a:hover{text-decoration:underline}

@@ -1,10 +1,22 @@
 import {describe, expect, test} from 'bun:test';
-import {createThreadsAdapter, THREADS_DEFAULTS} from '../src/adapters/threads';
+import ThreadsAdapter from '../src/adapters/ThreadsAdapter';
+import {THREADS_DEFAULTS} from '../src/config/defaults';
+import Config from '../src/config/Config';
+import HttpClient, {FIREFOX_UA} from '../src/services/HttpClient';
 import type {FetchFn} from '../src/adapters/types';
-import {FIREFOX_UA} from '../src/lib/http';
 import routeFixture from './fixtures/threads/route.json';
 import postImage from './fixtures/threads/post-image.json';
 import postVideo from './fixtures/threads/post-video.json';
+
+function createThreadsAdapter(
+    fetchFn: FetchFn = fetch,
+    threadsConfig = THREADS_DEFAULTS,
+): ThreadsAdapter {
+    return new ThreadsAdapter(
+        {threads: threadsConfig} as unknown as Config,
+        new HttpClient(fetchFn),
+    );
+}
 
 interface Recorded {
     url: string;
@@ -285,7 +297,7 @@ describe('threads adapter', () => {
         expect(m.kind).toBe('link');
         expect(m.description).toContain("couldn't be loaded");
         expect(m.siteName).toBe('Threads');
-        expect(m.nsfw).toBe(false);
+        expect(m.nsfw).toBeFalsy();
         expect(m.originalUrl).toBe(
             'https://www.threads.com/@johndoe/post/ABC123',
         );

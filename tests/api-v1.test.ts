@@ -183,3 +183,57 @@ describe('GET /api/v1/health', () => {
         expect(body.kind).toBe('video');
     });
 });
+
+describe('POST /api/v1/resolve (batch)', () => {
+    const post = (app: Hono, body: unknown) =>
+        authed(app, '/api/v1/resolve', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
+        });
+
+    test('resolves in request order with per-item isolation', async () => {
+        const app = createTestApp({config: cfg(), adapters: [proxAdapter]});
+        const res = await post(app, {
+            urls: [
+                'https://prox.test/1',
+                'not a url',
+                'https://unknown.dev/x',
+            ],
+        });
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as {results: Record<string, any>[]};
+        expect(body.results).toHaveLength(3);
+        expect(body.results[0]).toMatchObject({
+            url: 'https://prox.test/1',
+            status: 'ok',
+            platform: 'prox',
+        });
+        expect(body.results[1]).toEqual({
+            url: 'not a url',
+            status: 'error',
+            error: 'malformed url',
+        });
+        expect(body.results[2]).toMatchObject({
+            url: 'https://unknown.dev/x',
+            status: 'no-adapter',
+        });
+        expect(JSON.stringify(body)).not.toContain('proxyHeaders');
+    });
+
+    test('empty, non-array, or over-limit lists → 400', async () => {
+        const app = createTestApp({
+            config: cfg({batchMaxUrls: 2}),
+            adapters: [proxAdapter],
+        });
+        expect((await post(app, {urls: []})).status).toBe(400);
+        expect((await post(app, {urls: 'nope'})).status).toBe(400);
+        expect(
+            (
+                await post(app, {
+                    urls: ['a', 'b', 'c'].map((s) => `https://prox.test/${s}`),
+                })
+            ).status,
+        ).toBe(400);
+    });
+});

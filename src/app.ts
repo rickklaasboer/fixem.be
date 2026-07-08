@@ -141,7 +141,11 @@ export function buildApp(deps: AppDeps): Hono {
         }
         const outcome = await resolver.resolve(url);
         if (outcome.status === 'no-adapter')
-            return c.json({platform: 'none', status: 'no-adapter', hasMedia: false});
+            return c.json({
+                platform: 'none',
+                status: 'no-adapter',
+                hasMedia: false,
+            });
         if (outcome.status === 'degraded')
             return c.json({
                 platform: outcome.platform,

@@ -303,3 +303,17 @@ paths on the orange cloud if you like, but the media stream must not be.
    and retry with a fresh path (Discord caches embeds per-URL aggressively —
    change /hello to /hello2 to bust it).
 ```
+
+---
+
+## License
+
+Licensed under the **GNU Affero General Public License v3.0 or later**
+(`AGPL-3.0-or-later`) — see [`LICENSE`](LICENSE).
+
+In short: you may use, modify, and self-host fixem.be freely, but if you run a
+modified version as a network service, you must offer that service's users the
+corresponding source (see section 13 of the license). The landing page links
+back to this repository to satisfy that source-offer for the public instance.
+
+© 2026 Rick Klaasboer

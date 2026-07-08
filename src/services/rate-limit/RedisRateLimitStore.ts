@@ -1,5 +1,5 @@
 import type {RedisClient} from 'bun';
-import RateLimitStore from '@/services/RateLimitStore';
+import RateLimitStore from '@/services/rate-limit/RateLimitStore';
 
 // Sliding window over a Redis sorted set. Fail-open: if Redis is down,
 // rate limiting is disabled rather than blocking traffic.

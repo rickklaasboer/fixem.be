@@ -4,10 +4,10 @@ import {loadConfig} from '@/config/Config';
 import Logger from '@/services/Logger';
 import Clock from '@/services/Clock';
 import HttpClient, {type FetchFn} from '@/services/HttpClient';
-import ProxySigner from '@/services/ProxySigner';
-import MemoryRateLimitStore from '@/services/MemoryRateLimitStore';
-import VideoProxy from '@/services/VideoProxy';
-import ProxyStreamer from '@/services/ProxyStreamer';
+import ProxySigner from '@/services/proxy/ProxySigner';
+import MemoryRateLimitStore from '@/services/rate-limit/MemoryRateLimitStore';
+import VideoProxy from '@/services/proxy/VideoProxy';
+import ProxyStreamer from '@/services/proxy/ProxyStreamer';
 
 const SECRET = 's';
 const silent = new Logger({write: () => {}});

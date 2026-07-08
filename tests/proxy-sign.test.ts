@@ -1,5 +1,5 @@
 import {describe, expect, test} from 'bun:test';
-import ProxySigner, {type ProxyPayload} from '@/services/ProxySigner';
+import ProxySigner, {type ProxyPayload} from '@/services/proxy/ProxySigner';
 
 const SECRET = 'test-secret-key';
 const payload: ProxyPayload = {

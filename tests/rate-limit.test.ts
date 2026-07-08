@@ -1,8 +1,8 @@
 import {describe, expect, test} from 'bun:test';
 import type {RedisClient} from 'bun';
-import MemoryRateLimitStore from '@/services/MemoryRateLimitStore';
-import RateLimitStore from '@/services/RateLimitStore';
-import RedisRateLimitStore from '@/services/RedisRateLimitStore';
+import MemoryRateLimitStore from '@/services/rate-limit/MemoryRateLimitStore';
+import RateLimitStore from '@/services/rate-limit/RateLimitStore';
+import RedisRateLimitStore from '@/services/rate-limit/RedisRateLimitStore';
 
 describe('MemoryRateLimitStore', () => {
     test('counts hits within window, expires old ones', async () => {

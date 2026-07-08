@@ -1,4 +1,4 @@
-import Cache from '@/services/Cache';
+import Cache from '@/services/cache/Cache';
 
 // Test/dev backend: evicts lazily on read only and has no size bound, so it
 // is not suitable for production traffic — production wiring uses

@@ -1,5 +1,5 @@
 import type {RedisClient} from 'bun';
-import Cache from '@/services/Cache';
+import Cache from '@/services/cache/Cache';
 
 // Redis-backed cache. Every operation is best-effort: a Redis outage must
 // degrade to cache-less resolution, never break a request (spec §4).

@@ -36,7 +36,7 @@ Object-oriented / MVC-ish, wired by a `tsyringe` DI container (class-as-token, n
 - `src/domain/Resolver.ts` — cache (`meta:<canonical>`), in-flight dedup, per-resolve timeout, per-platform circuit breaker, and a top-level guard so `resolve()` never throws (degrades instead). Honors `EmbedMetadata.ttlSeconds`. `AdapterRegistry` picks the first adapter whose `match()` hits.
 - `src/adapters/*Adapter.ts` — one `@injectable` `PlatformAdapter` per platform, extending `BaseAdapter`; a pure **URL → `EmbedMetadata`** unit taking an injected `HttpClient` (+ `Config` where needed), so tests use recorded fixtures, no network. Adapters **throw** on failure; the resolver degrades. Reachable-but-refused (login walls, unavailable posts) return an informative `kind:"link"` card via `BaseAdapter.linkCard()` rather than throwing.
 - `src/render/{MetaHtmlRenderer,OembedRenderer}.ts` — build the crawler HTML + oEmbed JSON from one `EmbedMetadata`. `MetaHtmlRenderer` escapes every interpolated value.
-- `src/services/ProxyStreamer.ts` — `GET /v/:token`: HMAC-verified (`ProxySigner`), host-allowlisted, https-only, re-validates every redirect hop (SSRF guard), forwards `Range`, streams with concurrency + byte caps. `VideoProxy` signs the `/v/` tokens at render time. Used for platforms whose media CDN needs headers Discord won't send.
+- `src/services/proxy/ProxyStreamer.ts` — `GET /v/:token`: HMAC-verified (`ProxySigner`), host-allowlisted, https-only, re-validates every redirect hop (SSRF guard), forwards `Range`, streams with concurrency + byte caps. `VideoProxy` signs the `/v/` tokens at render time. Used for platforms whose media CDN needs headers Discord won't send.
 
 ## Conventions (follow these)
 

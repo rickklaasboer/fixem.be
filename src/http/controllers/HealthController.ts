@@ -1,7 +1,7 @@
 import {injectable} from 'tsyringe';
 import type {Context} from 'hono';
 import LandingPage from '@/services/LandingPage';
-import Cache from '@/services/Cache';
+import Cache from '@/services/cache/Cache';
 
 /**
  * Serves the landing page and the liveness/readiness probe.

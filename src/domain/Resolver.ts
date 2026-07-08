@@ -1,6 +1,6 @@
 import {singleton} from 'tsyringe';
 import AdapterRegistry from '@/domain/AdapterRegistry';
-import Cache from '@/services/Cache';
+import Cache from '@/services/cache/Cache';
 import Logger from '@/services/Logger';
 import Clock from '@/services/Clock';
 import Config from '@/config/Config';

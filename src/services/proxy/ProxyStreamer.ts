@@ -2,11 +2,11 @@ import {singleton} from 'tsyringe';
 import type {Context} from 'hono';
 import Config from '@/config/Config';
 import Logger from '@/services/Logger';
-import RateLimitStore from '@/services/RateLimitStore';
+import RateLimitStore from '@/services/rate-limit/RateLimitStore';
 import Clock from '@/services/Clock';
 import HttpClient from '@/services/HttpClient';
-import ProxySigner from '@/services/ProxySigner';
-import VideoProxy from '@/services/VideoProxy';
+import ProxySigner from '@/services/proxy/ProxySigner';
+import VideoProxy from '@/services/proxy/VideoProxy';
 
 const PASS_THROUGH = [
     'content-type',

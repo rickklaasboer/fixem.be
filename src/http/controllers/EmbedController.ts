@@ -2,7 +2,7 @@ import {injectable} from 'tsyringe';
 import type {Context} from 'hono';
 import Resolver from '@/domain/Resolver';
 import MetaHtmlRenderer from '@/render/MetaHtmlRenderer';
-import VideoProxy from '@/services/VideoProxy';
+import VideoProxy from '@/services/proxy/VideoProxy';
 import Crawler from '@/support/Crawler';
 import Config from '@/config/Config';
 import Logger from '@/services/Logger';

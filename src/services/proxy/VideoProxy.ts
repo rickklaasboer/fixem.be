@@ -1,6 +1,6 @@
 import {singleton} from 'tsyringe';
 import Config from '@/config/Config';
-import ProxySigner from '@/services/ProxySigner';
+import ProxySigner from '@/services/proxy/ProxySigner';
 import Clock from '@/services/Clock';
 import Logger from '@/services/Logger';
 import type EmbedMetadata from '@/domain/EmbedMetadata';

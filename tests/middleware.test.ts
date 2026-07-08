@@ -3,7 +3,7 @@ import {Hono} from 'hono';
 import type Config from '@/config/Config';
 import ApiAuthMiddleware from '@/http/middleware/ApiAuthMiddleware';
 import RateLimitMiddleware from '@/http/middleware/RateLimitMiddleware';
-import MemoryRateLimitStore from '@/services/MemoryRateLimitStore';
+import MemoryRateLimitStore from '@/services/rate-limit/MemoryRateLimitStore';
 import type Clock from '@/services/Clock';
 import Crawler from '@/support/Crawler';
 

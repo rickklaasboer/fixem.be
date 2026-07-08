@@ -2,7 +2,7 @@ import {singleton} from 'tsyringe';
 import type {MiddlewareHandler} from 'hono';
 import type Middleware from '@/http/middleware/Middleware';
 import Config from '@/config/Config';
-import RateLimitStore from '@/services/RateLimitStore';
+import RateLimitStore from '@/services/rate-limit/RateLimitStore';
 import Clock from '@/services/Clock';
 import Crawler from '@/support/Crawler';
 

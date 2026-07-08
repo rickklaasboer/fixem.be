@@ -1,9 +1,9 @@
 import {describe, expect, test} from 'bun:test';
 import Resolver from '@/domain/Resolver';
 import AdapterRegistry from '@/domain/AdapterRegistry';
-import MemoryCache from '@/services/MemoryCache';
+import MemoryCache from '@/services/cache/MemoryCache';
 import Logger from '@/services/Logger';
-import type Cache from '@/services/Cache';
+import type Cache from '@/services/cache/Cache';
 import type Clock from '@/services/Clock';
 import type Config from '@/config/Config';
 import type EmbedMetadata from '@/domain/EmbedMetadata';

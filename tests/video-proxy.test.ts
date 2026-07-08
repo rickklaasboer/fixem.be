@@ -1,6 +1,6 @@
 import {expect, test} from 'bun:test';
-import VideoProxy from '@/services/VideoProxy';
-import ProxySigner from '@/services/ProxySigner';
+import VideoProxy from '@/services/proxy/VideoProxy';
+import ProxySigner from '@/services/proxy/ProxySigner';
 import Clock from '@/services/Clock';
 import Logger from '@/services/Logger';
 import type Config from '@/config/Config';

@@ -1,6 +1,6 @@
 import {injectable} from 'tsyringe';
 import type {Context} from 'hono';
-import ProxyStreamer from '@/services/ProxyStreamer';
+import ProxyStreamer from '@/services/proxy/ProxyStreamer';
 
 /**
  * Thin wrapper around `ProxyStreamer` for the `/v/:token` route.

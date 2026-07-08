@@ -1,4 +1,4 @@
-import RateLimitStore from '@/services/RateLimitStore';
+import RateLimitStore from '@/services/rate-limit/RateLimitStore';
 
 export default class MemoryRateLimitStore extends RateLimitStore {
     private hits = new Map<string, number[]>();

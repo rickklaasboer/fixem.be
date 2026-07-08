@@ -4,13 +4,15 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Don't cancel a main-branch run: it may be mid-release (tagging/pushing).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   check:
@@ -26,11 +28,40 @@ jobs:
       - name: Test
         run: bun test
 
-  # On pushes to main only, publish a moving `edge` image + an immutable
-  # `sha-<short>` image. Tagged releases are handled by release.yml.
-  image:
+  # Every merge to main cuts a release: release-it bumps the version from the
+  # conventional commits (at least a patch), updates CHANGELOG.md, commits both,
+  # tags vX.Y.Z, and creates the GitHub Release. The commit/tag are pushed with
+  # GITHUB_TOKEN, which does not re-trigger this workflow (no loop).
+  release:
     needs: check
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.out.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main # be on the branch (not detached) so release-it can push
+          fetch-depth: 0 # full history + tags for conventional-changelog
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: release-it
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bunx release-it --ci
+      - name: Capture released version
+        id: out
+        run: echo "version=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+  # Build/push the released image (version + latest) plus an immutable sha tag.
+  image:
+    needs: release
     permissions:
       contents: read
       packages: write
@@ -38,4 +69,6 @@ jobs:
       attestations: write
       security-events: write
     uses: ./.github/workflows/build-image.yml
+    with:
+      release_tag: ${{ needs.release.outputs.version }}
     secrets: inherit

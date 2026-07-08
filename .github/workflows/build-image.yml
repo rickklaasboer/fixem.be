@@ -7,7 +7,7 @@ on:
   workflow_call:
     inputs:
       release_tag:
-        description: "Release tag like v1.2.3. Empty ⇒ edge/sha build from main."
+        description: "Release tag like v1.2.3 (every merge to main produces one)."
         required: false
         type: string
         default: ""
@@ -38,8 +38,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=edge,enable=${{ inputs.release_tag == '' }}
-            type=sha,prefix=sha-,enable=${{ inputs.release_tag == '' }}
+            type=sha,prefix=sha-
             type=semver,pattern={{version}},value=${{ inputs.release_tag }},enable=${{ inputs.release_tag != '' }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.release_tag }},enable=${{ inputs.release_tag != '' }}
             type=raw,value=latest,enable=${{ inputs.release_tag != '' }}

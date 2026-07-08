@@ -1,6 +1,6 @@
 import {describe, expect, test} from 'bun:test';
-import {renderOembed} from '../src/render/oembed';
-import type {EmbedMetadata} from '../src/adapters/types';
+import OembedRenderer from '@/render/OembedRenderer';
+import type EmbedMetadata from '@/domain/EmbedMetadata';
 
 const meta: EmbedMetadata = {
     kind: 'video',
@@ -10,9 +10,9 @@ const meta: EmbedMetadata = {
     originalUrl: 'https://www.reddit.com/x',
 };
 
-describe('renderOembed', () => {
+describe('OembedRenderer', () => {
     test('carries author and provider fields', () => {
-        const o = renderOembed(meta, 'https://fixem.be');
+        const o = new OembedRenderer().render(meta, 'https://fixem.be');
         expect(o).toEqual({
             version: '1.0',
             type: 'link',
@@ -25,7 +25,7 @@ describe('renderOembed', () => {
     });
 
     test('omits author fields when absent', () => {
-        const o = renderOembed(
+        const o = new OembedRenderer().render(
             {...meta, author: undefined},
             'https://fixem.be',
         );

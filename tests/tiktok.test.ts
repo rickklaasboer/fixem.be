@@ -1,9 +1,13 @@
 import {describe, expect, test} from 'bun:test';
-import {createTiktokAdapter, TIKTOK_DEFAULTS} from '../src/adapters/tiktok';
-import type {FetchFn} from '../src/adapters/types';
-import {CHROME_UA} from '../src/lib/http';
+import TiktokAdapter from '../src/adapters/TiktokAdapter';
+import {TIKTOK_DEFAULTS} from '../src/config/defaults';
+import Config from '../src/config/Config';
+import HttpClient, {CHROME_UA} from '../src/services/HttpClient';
+import type {FetchFn} from '@/services/HttpClient';
 import videoFixture from './fixtures/tiktok/universal-video.json';
 import photoFixture from './fixtures/tiktok/universal-photo.json';
+
+const CONFIG = {tiktok: TIKTOK_DEFAULTS} as unknown as Config;
 
 interface Recorded {
     url: string;
@@ -44,7 +48,7 @@ const PHOTO_URL = new URL(
 );
 
 describe('tiktok adapter', () => {
-    const a = createTiktokAdapter();
+    const a = new TiktokAdapter(CONFIG, new HttpClient());
 
     test('match: exact hosts + full-post/short-link shapes only', () => {
         expect(a.match(VIDEO_URL)).toBe(true);
@@ -114,7 +118,7 @@ describe('tiktok adapter', () => {
             return new Response(pageHtml(videoFixture), {status: 200});
         }) as unknown as FetchFn;
 
-        const ad = createTiktokAdapter(fetchFn);
+        const ad = new TiktokAdapter(CONFIG, new HttpClient(fetchFn));
         const m = await ad.resolve(new URL('https://vm.tiktok.com/ZMabcd123/'));
 
         // step 1: manual redirect probe with a browser UA
@@ -152,7 +156,7 @@ describe('tiktok adapter', () => {
             return new Response(pageHtml(videoFixture), {status: 200});
         }) as unknown as FetchFn;
 
-        const ad = createTiktokAdapter(fetchFn);
+        const ad = new TiktokAdapter(CONFIG, new HttpClient(fetchFn));
         const m = await ad.resolve(new URL('https://vt.tiktok.com/ZMxyz'));
         expect(recorded[1]!.url).toBe(
             'https://www.tiktok.com/@i/video/7311234567890123456',
@@ -163,7 +167,7 @@ describe('tiktok adapter', () => {
     test('short link that does not redirect throws', async () => {
         const fetchFn = (async () =>
             new Response(null, {status: 200})) as unknown as FetchFn;
-        const ad = createTiktokAdapter(fetchFn);
+        const ad = new TiktokAdapter(CONFIG, new HttpClient(fetchFn));
         expect(
             ad.resolve(new URL('https://vm.tiktok.com/ZMabcd123')),
         ).rejects.toThrow();
@@ -171,7 +175,10 @@ describe('tiktok adapter', () => {
 
     test('video: highest-bitrate PlayAddr, proxyHeaders, dims, poster, ttl', async () => {
         const recorded: Recorded[] = [];
-        const ad = createTiktokAdapter(pageFetch(videoFixture, recorded));
+        const ad = new TiktokAdapter(
+            CONFIG,
+            new HttpClient(pageFetch(videoFixture, recorded)),
+        );
         const m = await ad.resolve(VIDEO_URL);
 
         expect(m.kind).toBe('video');
@@ -220,7 +227,7 @@ describe('tiktok adapter', () => {
             headers.append('set-cookie', 'tt_csrf_token=xyz; Path=/');
             return new Response(pageHtml(videoFixture), {status: 200, headers});
         }) as unknown as FetchFn;
-        const ad = createTiktokAdapter(fetchFn);
+        const ad = new TiktokAdapter(CONFIG, new HttpClient(fetchFn));
         const m = await ad.resolve(VIDEO_URL);
         expect(m.video?.proxyHeaders?.Cookie).toBe(
             'ttwid=abc123; tt_csrf_token=xyz',
@@ -230,7 +237,10 @@ describe('tiktok adapter', () => {
     });
 
     test('video: no Cookie header when the page sets no cookies', async () => {
-        const ad = createTiktokAdapter(pageFetch(videoFixture));
+        const ad = new TiktokAdapter(
+            CONFIG,
+            new HttpClient(pageFetch(videoFixture)),
+        );
         const m = await ad.resolve(VIDEO_URL);
         expect(m.video?.proxyHeaders?.Cookie).toBeUndefined();
         expect(m.video?.proxyHeaders?.['User-Agent']).toBe(CHROME_UA);
@@ -249,7 +259,10 @@ describe('tiktok adapter', () => {
         noBitrate.__DEFAULT_SCOPE__[
             'webapp.video-detail'
         ].itemInfo.itemStruct.video.bitrateInfo = [];
-        const ad = createTiktokAdapter(pageFetch(noBitrate));
+        const ad = new TiktokAdapter(
+            CONFIG,
+            new HttpClient(pageFetch(noBitrate)),
+        );
         const m = await ad.resolve(VIDEO_URL);
         expect(m.kind).toBe('video');
         expect(m.video?.url).toBe(
@@ -258,7 +271,10 @@ describe('tiktok adapter', () => {
     });
 
     test('photo post: first image + count marker', async () => {
-        const ad = createTiktokAdapter(pageFetch(photoFixture));
+        const ad = new TiktokAdapter(
+            CONFIG,
+            new HttpClient(pageFetch(photoFixture)),
+        );
         const m = await ad.resolve(PHOTO_URL);
         expect(m.kind).toBe('image');
         expect(m.image?.url).toBe(
@@ -277,12 +293,15 @@ describe('tiktok adapter', () => {
             const restricted = {
                 __DEFAULT_SCOPE__: {'webapp.video-detail': {statusCode: code}},
             };
-            const ad = createTiktokAdapter(pageFetch(restricted));
+            const ad = new TiktokAdapter(
+                CONFIG,
+                new HttpClient(pageFetch(restricted)),
+            );
             const m = await ad.resolve(VIDEO_URL);
             expect(m.kind).toBe('link');
             expect(m.description).toContain('region-restricted or private');
             expect(m.siteName).toBe('TikTok');
-            expect(m.nsfw).toBe(false);
+            expect(m.nsfw).toBeFalsy();
             expect(m.originalUrl).toBe(
                 'https://www.tiktok.com/@janetravels/video/7311234567890123456',
             );
@@ -293,7 +312,10 @@ describe('tiktok adapter', () => {
         const notFound = {
             __DEFAULT_SCOPE__: {'webapp.video-detail': {statusCode: 10204}},
         };
-        const ad = createTiktokAdapter(pageFetch(notFound));
+        const ad = new TiktokAdapter(
+            CONFIG,
+            new HttpClient(pageFetch(notFound)),
+        );
         expect(ad.resolve(VIDEO_URL)).rejects.toThrow('tiktok: not found');
     });
 
@@ -302,14 +324,14 @@ describe('tiktok adapter', () => {
             new Response('<html><body>no data here</body></html>', {
                 status: 200,
             })) as unknown as FetchFn;
-        const ad = createTiktokAdapter(fetchFn);
+        const ad = new TiktokAdapter(CONFIG, new HttpClient(fetchFn));
         expect(ad.resolve(VIDEO_URL)).rejects.toThrow();
     });
 
     test('non-OK page response throws', async () => {
         const fetchFn = (async () =>
             new Response('blocked', {status: 403})) as unknown as FetchFn;
-        const ad = createTiktokAdapter(fetchFn);
+        const ad = new TiktokAdapter(CONFIG, new HttpClient(fetchFn));
         expect(ad.resolve(VIDEO_URL)).rejects.toThrow();
     });
 
@@ -327,10 +349,15 @@ describe('tiktok adapter', () => {
             new Response(pageHtml(videoFixture, '__CUSTOM_DATA__'), {
                 status: 200,
             })) as unknown as FetchFn;
-        const ad = createTiktokAdapter(fetchFn, {
-            ...TIKTOK_DEFAULTS,
-            rehydrationScriptId: '__CUSTOM_DATA__',
-        });
+        const ad = new TiktokAdapter(
+            {
+                tiktok: {
+                    ...TIKTOK_DEFAULTS,
+                    rehydrationScriptId: '__CUSTOM_DATA__',
+                },
+            } as unknown as Config,
+            new HttpClient(fetchFn),
+        );
         const m = await ad.resolve(VIDEO_URL);
         expect(m.kind).toBe('video');
         expect(m.title).toBe('Jane Traveler (@janetravels)');

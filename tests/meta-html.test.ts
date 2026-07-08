@@ -1,6 +1,8 @@
 import {describe, expect, test} from 'bun:test';
-import {minimalMeta, renderMetaHtml} from '../src/render/meta-html';
-import type {EmbedMetadata} from '../src/adapters/types';
+import MetaHtmlRenderer from '@/render/MetaHtmlRenderer';
+import type EmbedMetadata from '@/domain/EmbedMetadata';
+
+const r = new MetaHtmlRenderer();
 
 const base: EmbedMetadata = {
     kind: 'image',
@@ -15,7 +17,7 @@ const base: EmbedMetadata = {
 
 describe('renderMetaHtml', () => {
     test('image post has OG + twitter tags and oembed link', () => {
-        const html = renderMetaHtml(base, {
+        const html = r.render(base, {
             oembedUrl: 'https://fixem.be/oembed?url=x',
         });
         expect(html).toContain('<meta property="og:title" content="A post"');
@@ -40,7 +42,7 @@ describe('renderMetaHtml', () => {
     });
 
     test('escapes HTML in attribute values', () => {
-        const html = renderMetaHtml(base, {
+        const html = r.render(base, {
             oembedUrl: 'https://fixem.be/oembed?url=x',
         });
         expect(html).toContain('Hello &lt;world&gt; &amp; &quot;friends&quot;');
@@ -58,7 +60,7 @@ describe('renderMetaHtml', () => {
                 mimeType: 'video/mp4',
             },
         };
-        const html = renderMetaHtml(meta, {
+        const html = r.render(meta, {
             oembedUrl: 'https://fixem.be/oembed?url=x',
         });
         expect(html).toContain(
@@ -74,7 +76,7 @@ describe('renderMetaHtml', () => {
     });
 
     test('nsfw adds marker to title', () => {
-        const html = renderMetaHtml(
+        const html = r.render(
             {...base, nsfw: true},
             {oembedUrl: 'https://fixem.be/oembed?url=x'},
         );
@@ -88,7 +90,7 @@ describe('renderMetaHtml', () => {
             siteName: 'S',
             originalUrl: 'https://e.com/x',
         };
-        const html = renderMetaHtml(meta, {
+        const html = r.render(meta, {
             oembedUrl: 'https://fixem.be/oembed?url=x',
         });
         expect(html).toContain('<meta name="twitter:card" content="summary"');
@@ -97,7 +99,7 @@ describe('renderMetaHtml', () => {
     });
 
     test('minimalMeta builds a link-kind fallback', () => {
-        const m = minimalMeta('https://www.tiktok.com/@user/video/1');
+        const m = r.minimalMeta('https://www.tiktok.com/@user/video/1');
         expect(m.kind).toBe('link');
         expect(m.title).toBe('https://www.tiktok.com/@user/video/1');
         expect(m.originalUrl).toBe('https://www.tiktok.com/@user/video/1');

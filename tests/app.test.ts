@@ -1,41 +1,23 @@
 import {describe, expect, test} from 'bun:test';
-import {buildApp, type AppDeps} from '../src/app';
-import {loadConfig} from '../src/lib/config';
-import {createLogger} from '../src/lib/logger';
-import {MemoryCache} from '../src/lib/cache';
-import {MemoryRateLimitStore} from '../src/lib/rate-limit';
-import {Resolver} from '../src/resolver';
-import {AdapterRegistry} from '../src/adapters/registry';
-import {createDummyAdapter} from '../src/adapters/dummy';
+import type {Hono} from 'hono';
+import createTestApp, {type TestAppOverrides} from './support/createTestApp';
+import {loadConfig} from '@/config/Config';
+import type Config from '@/config/Config';
+import HttpClient from '@/services/HttpClient';
+import type Resolver from '@/domain/Resolver';
+import type PlatformAdapter from '@/domain/PlatformAdapter';
 
 const DISCORD_UA =
     'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)';
 const BROWSER_UA =
     'Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/126.0 Safari/537.36';
 
-function makeApp(overrides: Partial<AppDeps> = {}) {
-    const config = loadConfig({});
-    const logger = createLogger({write: () => {}});
-    const cache = new MemoryCache();
-    const resolver = new Resolver({
-        registry: new AdapterRegistry([createDummyAdapter()]),
-        cache,
-        logger,
-        ttlSeconds: config.cacheTtlSeconds,
-        timeoutMs: config.resolveTimeoutMs,
-    });
-    return buildApp({
-        config,
-        logger,
-        cache,
-        resolver,
-        rateLimitStore: new MemoryRateLimitStore(),
-        landingHtml: '<html>fixem.be landing</html>',
-        ...overrides,
-    });
-}
+// The default app: dummy adapter (example.com), defaults-only config, in-memory
+// cache/rate-limit, silent logger, stub landing HTML — the container-wired
+// equivalent of the pre-refactor buildApp fixture.
+const makeApp = (overrides: TestAppOverrides = {}) => createTestApp(overrides);
 
-function get(app: ReturnType<typeof makeApp>, path: string, ua: string) {
+function get(app: Hono, path: string, ua: string) {
     return app.request(path, {headers: {'User-Agent': ua}});
 }
 
@@ -148,6 +130,10 @@ describe('routes', () => {
     });
 
     test('garbage path is 400 with hint, never 500', async () => {
+        // Note: rate-limiting now runs before URL parsing (it's `*` middleware),
+        // so this single request consumes a rate-limit token before returning
+        // 400. That's fine — the default limit is 60/min and no test asserts an
+        // unparseable request skips the limiter.
         const res = await get(makeApp(), '/favicon.ico', BROWSER_UA);
         expect(res.status).toBe(400);
         expect(await res.text()).toContain('fixem.be');
@@ -179,12 +165,8 @@ describe('routes', () => {
     });
 
     const API_KEY = 'test-status-key';
-    const apiCfg = () => loadConfig({STATUS_API_KEY: API_KEY});
-    const apiGet = (
-        app: ReturnType<typeof makeApp>,
-        path: string,
-        key: string | null = API_KEY,
-    ) =>
+    const apiCfg: Partial<Config> = {statusApiKey: API_KEY};
+    const apiGet = (app: Hono, path: string, key: string | null = API_KEY) =>
         app.request(path, {
             headers: {
                 'User-Agent': BROWSER_UA,
@@ -194,7 +176,7 @@ describe('routes', () => {
 
     test('GET /api/status/adapter reports media JSON for a matched URL', async () => {
         const res = await apiGet(
-            makeApp({config: apiCfg()}),
+            makeApp({config: apiCfg}),
             `/api/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`,
         );
         expect(res.status).toBe(200);
@@ -207,7 +189,7 @@ describe('routes', () => {
 
     test('GET /api/status/adapter reports no-adapter for an unmatched URL', async () => {
         const res = await apiGet(
-            makeApp({config: apiCfg()}),
+            makeApp({config: apiCfg}),
             `/api/status/adapter?url=${encodeURIComponent('https://unknown-platform.dev/x')}`,
         );
         expect(res.status).toBe(200);
@@ -217,23 +199,16 @@ describe('routes', () => {
     });
 
     test('GET /api/status/adapter reports degraded (no media) when the adapter fails', async () => {
-        const failing = {
+        const failing: PlatformAdapter = {
             name: 'broken',
-            match: (u: URL) => u.hostname === 'broken.test',
-            canonicalize: (u: URL) => `https://broken.test${u.pathname}`,
+            match: (u) => u.hostname === 'broken.test',
+            canonicalize: (u) => `https://broken.test${u.pathname}`,
             resolve: async () => {
                 throw new Error('scraper died');
             },
         };
-        const resolver = new Resolver({
-            registry: new AdapterRegistry([failing]),
-            cache: new MemoryCache(),
-            logger: createLogger({write: () => {}}),
-            ttlSeconds: 60,
-            timeoutMs: 100,
-        });
         const res = await apiGet(
-            makeApp({config: apiCfg(), resolver}),
+            makeApp({config: apiCfg, adapters: [failing]}),
             `/api/status/adapter?url=${encodeURIComponent('https://broken.test/post/1')}`,
         );
         expect(res.status).toBe(200);
@@ -245,14 +220,14 @@ describe('routes', () => {
 
     test('GET /api/status/adapter 400s for a missing url', async () => {
         const res = await apiGet(
-            makeApp({config: apiCfg()}),
+            makeApp({config: apiCfg}),
             '/api/status/adapter',
         );
         expect(res.status).toBe(400);
     });
 
     test('/api/* requires a valid X-Api-Key', async () => {
-        const app = makeApp({config: apiCfg()});
+        const app = makeApp({config: apiCfg});
         const path = `/api/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`;
         expect((await apiGet(app, path, null)).status).toBe(401); // missing
         expect((await apiGet(app, path, 'wrong-key')).status).toBe(401); // wrong
@@ -267,8 +242,7 @@ describe('routes', () => {
     });
 
     test('browser requests are rate limited, crawlers exempt', async () => {
-        const config = loadConfig({RATE_LIMIT_PER_MIN: '2'});
-        const app = makeApp({config});
+        const app = makeApp({config: {rateLimitPerMin: 2}});
         const path = '/https://example.com/hello';
         expect((await get(app, path, BROWSER_UA)).status).toBe(302);
         expect((await get(app, path, BROWSER_UA)).status).toBe(302);
@@ -277,8 +251,7 @@ describe('routes', () => {
     });
 
     test('oembed is rate limited for browsers, crawlers exempt', async () => {
-        const config = loadConfig({RATE_LIMIT_PER_MIN: '1'});
-        const app = makeApp({config});
+        const app = makeApp({config: {rateLimitPerMin: 1}});
         const path = '/oembed?url=https%3A%2F%2Fexample.com%2Fhello';
         expect((await get(app, path, BROWSER_UA)).status).toBe(200);
         expect((await get(app, path, BROWSER_UA)).status).toBe(429);
@@ -286,8 +259,7 @@ describe('routes', () => {
     });
 
     test('/preview/ is rate limited like a browser', async () => {
-        const config = loadConfig({RATE_LIMIT_PER_MIN: '1'});
-        const app = makeApp({config});
+        const app = makeApp({config: {rateLimitPerMin: 1}});
         const path = '/preview/https://example.com/hello';
         expect((await get(app, path, BROWSER_UA)).status).toBe(200);
         expect((await get(app, path, BROWSER_UA)).status).toBe(429);
@@ -305,25 +277,15 @@ describe('routes', () => {
     });
 
     test('degraded resolve serves minimal embed to crawler', async () => {
-        const _config = loadConfig({});
-        const logger = createLogger({write: () => {}});
-        const cache = new MemoryCache();
-        const failing = {
+        const failing: PlatformAdapter = {
             name: 'broken',
-            match: (u: URL) => u.hostname === 'broken.test',
-            canonicalize: (u: URL) => `https://broken.test${u.pathname}`,
+            match: (u) => u.hostname === 'broken.test',
+            canonicalize: (u) => `https://broken.test${u.pathname}`,
             resolve: async () => {
                 throw new Error('scraper died');
             },
         };
-        const resolver = new Resolver({
-            registry: new AdapterRegistry([failing]),
-            cache,
-            logger,
-            ttlSeconds: 60,
-            timeoutMs: 100,
-        });
-        const app = makeApp({resolver});
+        const app = makeApp({adapters: [failing]});
         const res = await get(app, '/https://broken.test/post/1', DISCORD_UA);
         expect(res.status).toBe(200);
         expect(await res.text()).toContain(
@@ -333,22 +295,15 @@ describe('routes', () => {
     });
 
     test('degraded resolve under /preview/ reports the degrade reason', async () => {
-        const failing = {
+        const failing: PlatformAdapter = {
             name: 'broken',
-            match: (u: URL) => u.hostname === 'broken.test',
-            canonicalize: (u: URL) => `https://broken.test${u.pathname}`,
+            match: (u) => u.hostname === 'broken.test',
+            canonicalize: (u) => `https://broken.test${u.pathname}`,
             resolve: async () => {
                 throw new Error('scraper died');
             },
         };
-        const resolver = new Resolver({
-            registry: new AdapterRegistry([failing]),
-            cache: new MemoryCache(),
-            logger: createLogger({write: () => {}}),
-            ttlSeconds: 60,
-            timeoutMs: 100,
-        });
-        const app = makeApp({resolver});
+        const app = makeApp({adapters: [failing]});
         const res = await get(
             app,
             '/preview/https://broken.test/post/1',
@@ -378,7 +333,7 @@ describe('routes', () => {
 });
 
 test('reddit URL routes through app with fixture-backed adapter', async () => {
-    const {createRedditAdapter} = await import('../src/adapters/reddit');
+    const RedditAdapter = (await import('@/adapters/RedditAdapter')).default;
     const imagePost = (await import('./fixtures/reddit/image-post.json'))
         .default;
     // With credentials the adapter uses the OAuth JSON path; serve the token then
@@ -391,19 +346,11 @@ test('reddit URL routes through app with fixture-backed adapter', async () => {
         }
         return new Response(JSON.stringify(imagePost));
     }) as unknown as typeof fetch;
-    const _config = loadConfig({});
-    const logger = createLogger({write: () => {}});
-    const cache = new MemoryCache();
-    const resolver = new Resolver({
-        registry: new AdapterRegistry([
-            createRedditAdapter(fetchFn, {clientId: 'id', clientSecret: 'sec'}),
-        ]),
-        cache,
-        logger,
-        ttlSeconds: 60,
-        timeoutMs: 1000,
-    });
-    const app = makeApp({resolver});
+    const adapter = new RedditAdapter(
+        loadConfig({REDDIT_CLIENT_ID: 'id', REDDIT_CLIENT_SECRET: 'sec'}),
+        new HttpClient(fetchFn),
+    );
+    const app = createTestApp({adapters: [adapter]});
     const res = await get(
         app,
         '/https://old.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea/?utm=1',
@@ -425,9 +372,8 @@ test('reddit URL routes through app with fixture-backed adapter', async () => {
 });
 
 test('tiktok URL routes through the full app with a fixture-backed adapter', async () => {
-    const {createTiktokAdapter, TIKTOK_DEFAULTS} = await import(
-        '../src/adapters/tiktok'
-    );
+    const TiktokAdapter = (await import('@/adapters/TiktokAdapter')).default;
+    const {TIKTOK_DEFAULTS} = await import('@/config/defaults');
     const fixture = (await import('./fixtures/tiktok/universal-video.json'))
         .default;
     // TikTok ships the post JSON inside a <script> tag in the page HTML.
@@ -437,20 +383,11 @@ test('tiktok URL routes through the full app with a fixture-backed adapter', asy
         `</body></html>`;
     const fetchFn = (async () =>
         new Response(page, {status: 200})) as unknown as typeof fetch;
-    const config = loadConfig({
-        PROXY_SECRET: 's',
-        PUBLIC_BASE_URL: 'https://fixem.be',
+    const adapter = new TiktokAdapter(loadConfig({}), new HttpClient(fetchFn));
+    const app = createTestApp({
+        config: {proxySecret: 's', publicBaseUrl: 'https://fixem.be'},
+        adapters: [adapter],
     });
-    const logger = createLogger({write: () => {}});
-    const cache = new MemoryCache();
-    const resolver = new Resolver({
-        registry: new AdapterRegistry([createTiktokAdapter(fetchFn)]),
-        cache,
-        logger,
-        ttlSeconds: 60,
-        timeoutMs: 1000,
-    });
-    const app = makeApp({config, resolver});
     const res = await get(
         app,
         '/https://www.tiktok.com/@janetravels/video/7311234567890123456',
@@ -467,18 +404,12 @@ test('tiktok URL routes through the full app with a fixture-backed adapter', asy
 });
 
 test('proxied video is rewritten to a signed /v/ URL', async () => {
-    const config = loadConfig({
-        PROXY_SECRET: 's',
-        PUBLIC_BASE_URL: 'https://fixem.be',
-    });
-    const logger = createLogger({write: () => {}});
-    const cache = new MemoryCache();
-    const proxAdapter = {
+    const proxAdapter: PlatformAdapter = {
         name: 'prox',
-        match: (u: URL) => u.hostname === 'prox.test',
-        canonicalize: (u: URL) => `https://prox.test${u.pathname}`,
+        match: (u) => u.hostname === 'prox.test',
+        canonicalize: (u) => `https://prox.test${u.pathname}`,
         resolve: async () => ({
-            kind: 'video' as const,
+            kind: 'video',
             title: 'vid',
             siteName: 'Prox',
             originalUrl: 'https://prox.test/1',
@@ -489,14 +420,10 @@ test('proxied video is rewritten to a signed /v/ URL', async () => {
             },
         }),
     };
-    const resolver = new Resolver({
-        registry: new AdapterRegistry([proxAdapter]),
-        cache,
-        logger,
-        ttlSeconds: 60,
-        timeoutMs: 1000,
+    const app = createTestApp({
+        config: {proxySecret: 's', publicBaseUrl: 'https://fixem.be'},
+        adapters: [proxAdapter],
     });
-    const app = makeApp({config, resolver});
     const res = await get(app, '/https://prox.test/1', DISCORD_UA);
     const html = await res.text();
     const m = html.match(/og:video" content="([^"]+)"/);
@@ -505,15 +432,12 @@ test('proxied video is rewritten to a signed /v/ URL', async () => {
 });
 
 test('proxy-required video drops to link when PROXY_SECRET unset', async () => {
-    const config = loadConfig({}); // no PROXY_SECRET
-    const logger = createLogger({write: () => {}});
-    const cache = new MemoryCache();
-    const proxAdapter = {
+    const proxAdapter: PlatformAdapter = {
         name: 'prox',
-        match: (u: URL) => u.hostname === 'prox.test',
-        canonicalize: (u: URL) => `https://prox.test${u.pathname}`,
+        match: (u) => u.hostname === 'prox.test',
+        canonicalize: (u) => `https://prox.test${u.pathname}`,
         resolve: async () => ({
-            kind: 'video' as const,
+            kind: 'video',
             title: 'vid',
             siteName: 'Prox',
             originalUrl: 'https://prox.test/1',
@@ -524,15 +448,8 @@ test('proxy-required video drops to link when PROXY_SECRET unset', async () => {
             },
         }),
     };
-    const resolver = new Resolver({
-        registry: new AdapterRegistry([proxAdapter]),
-        cache,
-        logger,
-        ttlSeconds: 60,
-        timeoutMs: 1000,
-    });
     const res = await get(
-        makeApp({config, resolver}),
+        createTestApp({adapters: [proxAdapter]}), // no PROXY_SECRET
         '/https://prox.test/1',
         DISCORD_UA,
     );
@@ -542,22 +459,16 @@ test('proxy-required video drops to link when PROXY_SECRET unset', async () => {
 });
 
 test('proxy-required video on a non-allowlisted host drops to link (not a 403 player)', async () => {
-    const config = loadConfig({
-        PROXY_SECRET: 's',
-        PUBLIC_BASE_URL: 'https://fixem.be',
-    });
-    const logger = createLogger({write: () => {}});
-    const cache = new MemoryCache();
-    const proxAdapter = {
+    const proxAdapter: PlatformAdapter = {
         name: 'prox',
-        match: (u: URL) => u.hostname === 'prox.test',
-        canonicalize: (u: URL) => `https://prox.test${u.pathname}`,
+        match: (u) => u.hostname === 'prox.test',
+        canonicalize: (u) => `https://prox.test${u.pathname}`,
+        // host NOT on the proxy allowlist — a minted token would 403 at /v/
         resolve: async () => ({
-            kind: 'video' as const,
+            kind: 'video',
             title: 'vid',
             siteName: 'Prox',
             originalUrl: 'https://prox.test/1',
-            // host NOT on the proxy allowlist — a minted token would 403 at /v/
             video: {
                 url: 'https://sketchy-cdn.example/a.mp4',
                 mimeType: 'video/mp4',
@@ -565,15 +476,11 @@ test('proxy-required video on a non-allowlisted host drops to link (not a 403 pl
             },
         }),
     };
-    const resolver = new Resolver({
-        registry: new AdapterRegistry([proxAdapter]),
-        cache,
-        logger,
-        ttlSeconds: 60,
-        timeoutMs: 1000,
-    });
     const res = await get(
-        makeApp({config, resolver}),
+        createTestApp({
+            config: {proxySecret: 's', publicBaseUrl: 'https://fixem.be'},
+            adapters: [proxAdapter],
+        }),
         '/https://prox.test/1',
         DISCORD_UA,
     );

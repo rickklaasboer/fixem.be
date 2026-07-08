@@ -1,6 +1,8 @@
 import {describe, expect, test} from 'bun:test';
-import {createTwitterAdapter, syndicationToken} from '../src/adapters/twitter';
-import type {FetchFn} from '../src/adapters/types';
+import TwitterAdapter, {syndicationToken} from '@/adapters/TwitterAdapter';
+import Config from '@/config/Config';
+import {SYNDICATION_FEATURES} from '@/config/defaults';
+import HttpClient, {type FetchFn} from '@/services/HttpClient';
 import photoTweet from './fixtures/twitter/photo-tweet.json';
 import videoTweet from './fixtures/twitter/video-tweet.json';
 import quoteTweet from './fixtures/twitter/quote-tweet.json';
@@ -13,10 +15,19 @@ function fakeFetch(body: unknown, requested: string[] = []): FetchFn {
     }) as unknown as FetchFn;
 }
 
+function makeAdapter(fetchFn: FetchFn, features?: string): TwitterAdapter {
+    return new TwitterAdapter(
+        {
+            twitterSyndicationFeatures: features ?? SYNDICATION_FEATURES,
+        } as unknown as Config,
+        new HttpClient(fetchFn),
+    );
+}
+
 const TWEET_URL = new URL('https://x.com/janedoe/status/1785342865283856000');
 
 describe('twitter adapter', () => {
-    const a = createTwitterAdapter(fakeFetch(photoTweet));
+    const a = makeAdapter(fakeFetch(photoTweet));
 
     test('match covers twitter.com and x.com status URLs', () => {
         expect(a.match(TWEET_URL)).toBe(true);
@@ -54,7 +65,7 @@ describe('twitter adapter', () => {
 
     test('photo tweet: image kind, count marker, author', async () => {
         const requested: string[] = [];
-        const ad = createTwitterAdapter(fakeFetch(photoTweet, requested));
+        const ad = makeAdapter(fakeFetch(photoTweet, requested));
         const m = await ad.resolve(TWEET_URL);
         expect(requested[0]).toContain(
             'cdn.syndication.twimg.com/tweet-result?id=1785342865283856000',
@@ -72,7 +83,7 @@ describe('twitter adapter', () => {
     });
 
     test('video tweet: highest-bitrate mp4, poster, nsfw flag', async () => {
-        const ad = createTwitterAdapter(fakeFetch(videoTweet));
+        const ad = makeAdapter(fakeFetch(videoTweet));
         const m = await ad.resolve(TWEET_URL);
         expect(m.kind).toBe('video');
         expect(m.video?.url).toBe('https://video.twimg.com/vid-2176.mp4');
@@ -86,7 +97,7 @@ describe('twitter adapter', () => {
     });
 
     test('quote tweet appends quoted text', async () => {
-        const ad = createTwitterAdapter(fakeFetch(quoteTweet));
+        const ad = makeAdapter(fakeFetch(quoteTweet));
         const m = await ad.resolve(TWEET_URL);
         expect(m.description).toBe(
             'This. ↪ @dave: Original hot take about embeds.',
@@ -94,17 +105,17 @@ describe('twitter adapter', () => {
     });
 
     test('tombstone returns informative text-only embed', async () => {
-        const ad = createTwitterAdapter(fakeFetch(tombstone));
+        const ad = makeAdapter(fakeFetch(tombstone));
         const m = await ad.resolve(TWEET_URL);
         expect(m.kind).toBe('link');
         expect(m.title).toBe('@janedoe');
-        expect(m.nsfw).toBe(false);
+        expect(m.nsfw).toBeFalsy();
         expect(m.ttlSeconds).toBe(600);
         expect(m.description).toContain('unavailable');
     });
 
     test('empty response throws', async () => {
-        const ad = createTwitterAdapter(fakeFetch({}));
+        const ad = makeAdapter(fakeFetch({}));
         await expect(ad.resolve(TWEET_URL)).rejects.toThrow(
             'twitter: tweet unavailable',
         );

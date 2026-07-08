@@ -1,6 +1,7 @@
 import {describe, expect, test} from 'bun:test';
-import {createBlueskyAdapter} from '../src/adapters/bluesky';
-import type {FetchFn} from '../src/adapters/types';
+import BlueskyAdapter from '../src/adapters/BlueskyAdapter';
+import HttpClient from '../src/services/HttpClient';
+import type {FetchFn} from '../src/services/HttpClient';
 import resolveHandle from './fixtures/bluesky/resolve-handle.json';
 import postImages from './fixtures/bluesky/post-images.json';
 import postVideo from './fixtures/bluesky/post-video.json';
@@ -25,7 +26,7 @@ const POST_URL = new URL(
 );
 
 describe('bluesky adapter', () => {
-    const a = createBlueskyAdapter();
+    const a = new BlueskyAdapter(new HttpClient());
 
     test('match requires profile/post path shape', () => {
         expect(a.match(POST_URL)).toBe(true);
@@ -49,7 +50,9 @@ describe('bluesky adapter', () => {
 
     test('resolves handle to did, then fetches thread', async () => {
         const requested: string[] = [];
-        const ad = createBlueskyAdapter(fakeFetch(postImages, requested));
+        const ad = new BlueskyAdapter(
+            new HttpClient(fakeFetch(postImages, requested)),
+        );
         const m = await ad.resolve(POST_URL);
         expect(requested[0]).toContain(
             'resolveHandle?handle=alice.bsky.social',
@@ -71,7 +74,9 @@ describe('bluesky adapter', () => {
 
     test('did in URL skips handle resolution', async () => {
         const requested: string[] = [];
-        const ad = createBlueskyAdapter(fakeFetch(postImages, requested));
+        const ad = new BlueskyAdapter(
+            new HttpClient(fakeFetch(postImages, requested)),
+        );
         await ad.resolve(
             new URL('https://bsky.app/profile/did:plc:abc123xyz/post/3kabc'),
         );
@@ -79,7 +84,7 @@ describe('bluesky adapter', () => {
     });
 
     test('video post uses thumbnail image, no video field (HLS)', async () => {
-        const ad = createBlueskyAdapter(fakeFetch(postVideo));
+        const ad = new BlueskyAdapter(new HttpClient(fakeFetch(postVideo)));
         const m = await ad.resolve(
             new URL('https://bsky.app/profile/bob.bsky.social/post/3kvid'),
         );
@@ -92,7 +97,7 @@ describe('bluesky adapter', () => {
     });
 
     test('quote post appends quoted text', async () => {
-        const ad = createBlueskyAdapter(fakeFetch(postQuote));
+        const ad = new BlueskyAdapter(new HttpClient(fakeFetch(postQuote)));
         const m = await ad.resolve(
             new URL('https://bsky.app/profile/carol.bsky.social/post/3kquo'),
         );
@@ -102,7 +107,7 @@ describe('bluesky adapter', () => {
     });
 
     test('external embed uses thumb and link title', async () => {
-        const ad = createBlueskyAdapter(fakeFetch(postExternal));
+        const ad = new BlueskyAdapter(new HttpClient(fakeFetch(postExternal)));
         const m = await ad.resolve(
             new URL('https://bsky.app/profile/erin.bsky.social/post/3kext'),
         );
@@ -114,13 +119,15 @@ describe('bluesky adapter', () => {
     });
 
     test('not-found post returns an informative Bluesky card (not a throw)', async () => {
-        const ad = createBlueskyAdapter(
-            fakeFetch({
-                thread: {
-                    $type: 'app.bsky.feed.defs#notFoundPost',
-                    notFound: true,
-                },
-            }),
+        const ad = new BlueskyAdapter(
+            new HttpClient(
+                fakeFetch({
+                    thread: {
+                        $type: 'app.bsky.feed.defs#notFoundPost',
+                        notFound: true,
+                    },
+                }),
+            ),
         );
         const m = await ad.resolve(POST_URL);
         expect(m.kind).toBe('link');
@@ -133,13 +140,15 @@ describe('bluesky adapter', () => {
     });
 
     test('blocked post returns a branded blocked card', async () => {
-        const ad = createBlueskyAdapter(
-            fakeFetch({
-                thread: {
-                    $type: 'app.bsky.feed.defs#blockedPost',
-                    blocked: true,
-                },
-            }),
+        const ad = new BlueskyAdapter(
+            new HttpClient(
+                fakeFetch({
+                    thread: {
+                        $type: 'app.bsky.feed.defs#blockedPost',
+                        blocked: true,
+                    },
+                }),
+            ),
         );
         const m = await ad.resolve(POST_URL);
         expect(m.kind).toBe('link');
@@ -152,13 +161,13 @@ describe('bluesky adapter', () => {
             thread: {post: {labels?: {val: string}[]}};
         };
         labeled.thread.post.labels = [{val: 'porn'}];
-        const ad = createBlueskyAdapter(fakeFetch(labeled));
+        const ad = new BlueskyAdapter(new HttpClient(fakeFetch(labeled)));
         const m = await ad.resolve(POST_URL);
         expect(m.nsfw).toBe(true);
         // unlabeled fixture stays safe
-        const plain = await createBlueskyAdapter(fakeFetch(postImages)).resolve(
-            POST_URL,
-        );
+        const plain = await new BlueskyAdapter(
+            new HttpClient(fakeFetch(postImages)),
+        ).resolve(POST_URL);
         expect(plain.nsfw).toBe(false);
     });
 
@@ -167,7 +176,7 @@ describe('bluesky adapter', () => {
             thread: {post: {embed: {record: {value: {text: string}}}}};
         };
         empty.thread.post.embed.record.value.text = '';
-        const ad = createBlueskyAdapter(fakeFetch(empty));
+        const ad = new BlueskyAdapter(new HttpClient(fakeFetch(empty)));
         const m = await ad.resolve(
             new URL('https://bsky.app/profile/carol.bsky.social/post/3kquo'),
         );
@@ -179,7 +188,7 @@ describe('bluesky adapter', () => {
             thread: {post: {author: {displayName?: string}}};
         };
         noName.thread.post.author.displayName = '';
-        const ad = createBlueskyAdapter(fakeFetch(noName));
+        const ad = new BlueskyAdapter(new HttpClient(fakeFetch(noName)));
         const m = await ad.resolve(POST_URL);
         expect(m.title).toBe('@alice.bsky.social');
         expect(m.author?.name).toBe('alice.bsky.social');

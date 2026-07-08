@@ -1,14 +1,18 @@
 import {describe, expect, test} from 'bun:test';
 import {Hono} from 'hono';
-import {mountProxy, isHostAllowed} from '../src/proxy';
-import {loadConfig} from '../src/lib/config';
-import {createLogger} from '../src/lib/logger';
-import {MemoryRateLimitStore} from '../src/lib/rate-limit';
-import {signProxyToken} from '../src/lib/proxy-sign';
-import type {FetchFn} from '../src/adapters/types';
+import {loadConfig} from '@/config/Config';
+import Logger from '@/services/Logger';
+import Clock from '@/services/Clock';
+import HttpClient, {type FetchFn} from '@/services/HttpClient';
+import ProxySigner from '@/services/proxy/ProxySigner';
+import MemoryRateLimitStore from '@/services/rate-limit/MemoryRateLimitStore';
+import VideoProxy from '@/services/proxy/VideoProxy';
+import ProxyStreamer from '@/services/proxy/ProxyStreamer';
 
 const SECRET = 's';
-const silent = createLogger({write: () => {}});
+const silent = new Logger({write: () => {}});
+const clock = {now: () => 1000} as Clock;
+const signer = new ProxySigner();
 
 async function appWith(
     fetchFn: FetchFn,
@@ -16,12 +20,20 @@ async function appWith(
 ) {
     const config = loadConfig({PROXY_SECRET: SECRET, ...overrides});
     const app = new Hono();
-    mountProxy(app, {config, logger: silent, fetchFn, now: () => 1000});
+    const streamer = new ProxyStreamer(
+        config,
+        silent,
+        new MemoryRateLimitStore(),
+        clock,
+        new HttpClient(fetchFn),
+        signer,
+    );
+    app.get('/v/:token', (c) => streamer.stream(c));
     return app;
 }
 
 async function tokenFor(url: string, headers: Record<string, string> = {}) {
-    return signProxyToken(SECRET, {url, headers, exp: 2000});
+    return signer.sign(SECRET, {url, headers, exp: 2000});
 }
 
 describe('/v/ proxy', () => {
@@ -111,13 +123,18 @@ describe('/v/ proxy', () => {
     test('404 when proxy secret is unset (disabled)', async () => {
         const config = loadConfig({}); // no PROXY_SECRET
         const app = new Hono();
-        mountProxy(app, {
+        const streamer = new ProxyStreamer(
             config,
-            logger: silent,
-            fetchFn: (async () => new Response('x')) as unknown as FetchFn,
-            now: () => 1000,
-        });
-        const tok = await signProxyToken('s', {
+            silent,
+            new MemoryRateLimitStore(),
+            clock,
+            new HttpClient(
+                (async () => new Response('x')) as unknown as FetchFn,
+            ),
+            signer,
+        );
+        app.get('/v/:token', (c) => streamer.stream(c));
+        const tok = await signer.sign('s', {
             url: 'https://v16.tiktokcdn.com/a.mp4',
             headers: {},
             exp: 2000,
@@ -129,7 +146,7 @@ describe('/v/ proxy', () => {
         const app = await appWith(
             (async () => new Response('x')) as unknown as FetchFn,
         );
-        const expired = await signProxyToken(SECRET, {
+        const expired = await signer.sign(SECRET, {
             url: 'https://v16.tiktokcdn.com/a.mp4',
             headers: {},
             exp: 500,
@@ -301,12 +318,7 @@ describe('/v/ proxy', () => {
                 headers: {'content-type': 'video/mp4'},
             });
         }) as unknown as FetchFn;
-        const config = loadConfig({
-            PROXY_SECRET: SECRET,
-            PROXY_MAX_CONCURRENT: '1',
-        });
-        const app = new Hono();
-        mountProxy(app, {config, logger: silent, fetchFn, now: () => 1000});
+        const app = await appWith(fetchFn, {PROXY_MAX_CONCURRENT: '1'});
         const tok = await tokenFor('https://v16.tiktokcdn.com/a.mp4');
 
         // First request occupies the only slot; its body is still streaming (unread).
@@ -348,19 +360,11 @@ describe('/v/ proxy', () => {
     });
 
     test('429 when the client IP exceeds the rate limit', async () => {
-        const config = loadConfig({
-            PROXY_SECRET: SECRET,
-            RATE_LIMIT_PER_MIN: '1',
-        });
-        const app = new Hono();
-        mountProxy(app, {
-            config,
-            logger: silent,
-            rateLimitStore: new MemoryRateLimitStore(),
-            fetchFn: (async () =>
+        const app = await appWith(
+            (async () =>
                 new Response('x', {status: 200})) as unknown as FetchFn,
-            now: () => 1000,
-        });
+            {RATE_LIMIT_PER_MIN: '1'},
+        );
         const tok = await tokenFor('https://v16.tiktokcdn.com/a.mp4');
         expect((await app.request(`/v/${tok}`)).status).toBe(200);
         expect((await app.request(`/v/${tok}`)).status).toBe(429);
@@ -368,13 +372,19 @@ describe('/v/ proxy', () => {
 
     test('isHostAllowed resists suffix-bypass shapes', () => {
         const list = ['tiktokcdn.com', 'cdninstagram.com'];
-        expect(isHostAllowed('v16.tiktokcdn.com', list)).toBe(true);
-        expect(isHostAllowed('tiktokcdn.com', list)).toBe(true);
-        expect(isHostAllowed('evil-tiktokcdn.com', list)).toBe(false);
-        expect(isHostAllowed('tiktokcdn.com.evil.com', list)).toBe(false);
-        expect(isHostAllowed('cdninstagram.com.attacker.net', list)).toBe(
+        expect(VideoProxy.isHostAllowed('v16.tiktokcdn.com', list)).toBe(true);
+        expect(VideoProxy.isHostAllowed('tiktokcdn.com', list)).toBe(true);
+        expect(VideoProxy.isHostAllowed('evil-tiktokcdn.com', list)).toBe(
             false,
         );
-        expect(isHostAllowed('notcdninstagram.com', list)).toBe(false);
+        expect(VideoProxy.isHostAllowed('tiktokcdn.com.evil.com', list)).toBe(
+            false,
+        );
+        expect(
+            VideoProxy.isHostAllowed('cdninstagram.com.attacker.net', list),
+        ).toBe(false);
+        expect(VideoProxy.isHostAllowed('notcdninstagram.com', list)).toBe(
+            false,
+        );
     });
 });

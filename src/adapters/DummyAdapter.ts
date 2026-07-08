@@ -1,6 +1,5 @@
 import {injectable} from 'tsyringe';
 import BaseAdapter from '@/adapters/BaseAdapter';
-import HttpClient from '@/services/HttpClient';
 import type EmbedMetadata from '@/domain/EmbedMetadata';
 
 const DUMMY_HOSTS = new Set(['example.com', 'www.example.com']);
@@ -13,10 +12,6 @@ const DUMMY_HOSTS = new Set(['example.com', 'www.example.com']);
 @injectable()
 export default class DummyAdapter extends BaseAdapter {
     public name = 'dummy';
-
-    constructor(private http: HttpClient) {
-        super();
-    }
 
     public match(url: URL): boolean {
         return DUMMY_HOSTS.has(url.hostname);

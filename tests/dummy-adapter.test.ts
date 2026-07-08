@@ -1,10 +1,9 @@
 import {describe, it, expect} from 'bun:test';
 import DummyAdapter from '@/adapters/DummyAdapter';
-import HttpClient from '@/services/HttpClient';
 import type EmbedMetadata from '@/domain/EmbedMetadata';
 
 describe('DummyAdapter', () => {
-    const adapter = new DummyAdapter(new HttpClient());
+    const adapter = new DummyAdapter();
 
     it('matches example.com', () => {
         expect(adapter.match(new URL('https://example.com/some-page'))).toBe(

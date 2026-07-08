@@ -1,6 +1,7 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
 import { truncate } from "../lib/text";
 import { CHROME_UA } from "../lib/http";
+import { fetchSnapsaveMedia } from "./snapsave";
 
 const HOSTS = new Set(["instagram.com", "www.instagram.com", "ddinstagram.com"]);
 // /(p|reel|reels|tv)/<code>. The <code> is base64-ish (starts C/D/B) — allow the
@@ -33,6 +34,9 @@ export interface InstagramConfig {
   // sent on the metadata request, is never logged, and never enters the /v/ proxy
   // token (media replays on its own signed URL). Burners get banned; expect churn.
   cookie?: string;
+  // Opt-in last-resort fallback: when our own fetch is login-walled, resolve via
+  // snapsave.app (third-party, fragile — see snapsave.ts). Off by default.
+  snapsave?: boolean;
 }
 
 export const INSTAGRAM_DEFAULTS: InstagramConfig = {
@@ -186,7 +190,34 @@ export function createInstagramAdapter(
       const canonical = `https://www.instagram.com/p/${code}`;
 
       const media = await fetchMedia(code);
-      if (!media) return loginWallEmbed(canonical);
+      if (!media) {
+        // Login-walled → optional snapsave.app fallback (third-party) before the
+        // informative degrade. rapidcdn media links are Discord-fetchable directly,
+        // so no /v/ proxy and no proxyHeaders.
+        if (cfg.snapsave) {
+          const snap = await fetchSnapsaveMedia(canonical, fetchFn);
+          if (snap) {
+            return {
+              kind: snap.kind,
+              title: "Instagram",
+              description: snap.count > 1 ? `📷 ${snap.count} items` : undefined,
+              siteName: "Instagram",
+              themeColor: "#E1306C",
+              image:
+                snap.kind === "video"
+                  ? snap.thumbnailUrl
+                    ? { url: snap.thumbnailUrl }
+                    : undefined
+                  : { url: snap.mediaUrl },
+              video: snap.kind === "video" ? { url: snap.mediaUrl, mimeType: "video/mp4" } : undefined,
+              nsfw: false,
+              ttlSeconds: 1800, // rapidcdn JWT links are short-lived
+              originalUrl: canonical,
+            };
+          }
+        }
+        return loginWallEmbed(canonical);
+      }
 
       const username = media.owner?.username ?? "instagram";
       const descParts: string[] = [];

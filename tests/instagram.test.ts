@@ -315,6 +315,33 @@ describe("instagram adapter", () => {
     expect(m.video?.proxyHeaders?.Cookie).toBeUndefined();
   });
 
+  test("snapsave fallback fires when our own fetch is login-walled (opt-in)", async () => {
+    const blob = await Bun.file(
+      new URL("./fixtures/instagram/snapsave-response.txt", import.meta.url),
+    ).text();
+    // graphql → login wall; snapsave.app → the recorded blob
+    const fetchFn = (async (input: unknown) => {
+      if (String(input).includes("snapsave")) return new Response(blob, { status: 200 });
+      return new Response(JSON.stringify({ status: "fail", require_login: true }), { status: 200 });
+    }) as unknown as FetchFn;
+    const ad = createInstagramAdapter(fetchFn, { ...INSTAGRAM_DEFAULTS, snapsave: true });
+    const m = await ad.resolve(P_URL);
+    expect(m.kind).toBe("image"); // recorded blob is a photo
+    expect(m.image?.url).toContain("d.rapidcdn.app");
+    expect(m.description ?? "").not.toContain("blocked"); // NOT the login-wall degrade
+  });
+
+  test("without the snapsave flag, a login wall still degrades to the informative card", async () => {
+    const fetchFn = (async (input: unknown) => {
+      if (String(input).includes("snapsave")) throw new Error("should not be called");
+      return new Response(JSON.stringify({ status: "fail" }), { status: 200 });
+    }) as unknown as FetchFn;
+    const ad = createInstagramAdapter(fetchFn, { ...INSTAGRAM_DEFAULTS, snapsave: false });
+    const m = await ad.resolve(P_URL);
+    expect(m.kind).toBe("link");
+    expect(m.description).toContain("blocked");
+  });
+
   test("config is injectable (2nd param overrides defaults)", async () => {
     const recorded: Recorded[] = [];
     const ad = createInstagramAdapter(fakeFetch({ recorded }), {

@@ -104,6 +104,8 @@ export function loadConfig(
       // Optional logged-in session cookie (burner sessionid=...); authenticates
       // the GraphQL call past the login wall. A full account credential — keep secret.
       cookie: env.INSTAGRAM_COOKIE || undefined,
+      // Opt-in snapsave.app fallback when our own fetch is login-walled.
+      snapsave: env.INSTAGRAM_SNAPSAVE === "true",
     },
   };
 }

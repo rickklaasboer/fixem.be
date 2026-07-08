@@ -1,9 +1,13 @@
 import {describe, expect, test} from 'bun:test';
-import {Resolver} from '../src/resolver';
-import {AdapterRegistry} from '../src/adapters/registry';
-import {MemoryCache} from '../src/lib/cache';
-import {createLogger} from '../src/lib/logger';
-import type {EmbedMetadata, PlatformAdapter} from '../src/adapters/types';
+import Resolver from '@/domain/Resolver';
+import AdapterRegistry from '@/domain/AdapterRegistry';
+import MemoryCache from '@/services/MemoryCache';
+import Logger from '@/services/Logger';
+import type Cache from '@/services/Cache';
+import type Clock from '@/services/Clock';
+import type Config from '@/config/Config';
+import type EmbedMetadata from '@/domain/EmbedMetadata';
+import type PlatformAdapter from '@/domain/PlatformAdapter';
 
 const META: EmbedMetadata = {
     kind: 'link',
@@ -12,7 +16,7 @@ const META: EmbedMetadata = {
     originalUrl: 'https://fake.test/p',
 };
 
-const silent = createLogger({write: () => {}});
+const silent = new Logger({write: () => {}});
 
 function fakeAdapter(overrides: Partial<PlatformAdapter> = {}) {
     let calls = 0;
@@ -29,18 +33,41 @@ function fakeAdapter(overrides: Partial<PlatformAdapter> = {}) {
     return {adapter, calls: () => calls};
 }
 
-function makeResolver(
-    adapter: PlatformAdapter,
-    opts: Partial<ConstructorParameters<typeof Resolver>[0]> = {},
-) {
-    return new Resolver({
-        registry: new AdapterRegistry([adapter]),
-        cache: new MemoryCache(),
-        logger: silent,
-        ttlSeconds: 3600,
-        timeoutMs: 200,
-        ...opts,
-    });
+interface ResolverOverrides {
+    cache?: Cache;
+    ttlSeconds?: number;
+    timeoutMs?: number;
+    breakerThreshold?: number;
+    breakerCooldownMs?: number;
+    now?: () => number;
+}
+
+function makeResolver(adapter: PlatformAdapter, opts: ResolverOverrides = {}) {
+    const {
+        cache = new MemoryCache(),
+        ttlSeconds = 3600,
+        timeoutMs = 200,
+        breakerThreshold,
+        breakerCooldownMs,
+        now,
+    } = opts;
+    const clock = {now: now ?? Date.now} as Clock;
+    const config = {
+        cacheTtlSeconds: ttlSeconds,
+        resolveTimeoutMs: timeoutMs,
+    } as unknown as Config;
+    const registry = new AdapterRegistry([adapter]);
+    return breakerThreshold === undefined && breakerCooldownMs === undefined
+        ? new Resolver(registry, cache, silent, clock, config)
+        : new Resolver(
+              registry,
+              cache,
+              silent,
+              clock,
+              config,
+              breakerThreshold ?? 5,
+              breakerCooldownMs ?? 60_000,
+          );
 }
 
 describe('Resolver', () => {

@@ -139,6 +139,33 @@ describe('loadConfig', () => {
         expect(c.proxyHostAllowlist).toContain('tiktokcdn-eu.com');
     });
 
+    test('parses API_KEYS as a trimmed, empty-filtered list; defaults to []', () => {
+        expect(loadConfig({}).apiKeys).toEqual([]);
+        expect(loadConfig({API_KEYS: ''}).apiKeys).toEqual([]);
+        expect(loadConfig({API_KEYS: 'k1, k2 ,,k3'}).apiKeys).toEqual([
+            'k1',
+            'k2',
+            'k3',
+        ]);
+    });
+
+    test('API rate limit and batch bound default and honor overrides', () => {
+        const d = loadConfig({});
+        expect(d.apiRateLimitPerMin).toBe(60);
+        expect(d.batchMaxUrls).toBe(20);
+        const o = loadConfig({
+            API_RATE_LIMIT_PER_MIN: '120',
+            BATCH_MAX_URLS: '5',
+        });
+        expect(o.apiRateLimitPerMin).toBe(120);
+        expect(o.batchMaxUrls).toBe(5);
+        // below-floor values fall back (intMin), matching the other numeric knobs
+        expect(loadConfig({API_RATE_LIMIT_PER_MIN: '0'}).apiRateLimitPerMin).toBe(
+            60,
+        );
+        expect(loadConfig({BATCH_MAX_URLS: '-3'}).batchMaxUrls).toBe(20);
+    });
+
     test('falls back to default on non-numeric value', () => {
         expect(loadConfig({PORT: 'banana'}).port).toBe(3000);
     });

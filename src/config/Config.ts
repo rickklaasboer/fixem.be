@@ -17,6 +17,10 @@ export default class Config {
     public readonly rateLimitPerMin!: number;
     public readonly publicBaseUrl!: string;
     public readonly extraCrawlerUas!: string[];
+    // Public API v1 surface.
+    public readonly apiKeys!: string[];
+    public readonly apiRateLimitPerMin!: number;
+    public readonly batchMaxUrls!: number;
     public readonly twitchClientId?: string;
     public readonly twitchClientSecret?: string;
     public readonly twitchGqlClientId!: string;
@@ -83,6 +87,14 @@ export function loadConfig(
             .split(',')
             .map((s) => s.trim().toLowerCase())
             .filter(Boolean),
+        // Comma-separated set of valid bearer keys for /api/v1/*; empty = closed.
+        // Same parse shape as proxyHostAllowlist (trim, drop empties).
+        apiKeys: (env.API_KEYS ?? '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+        apiRateLimitPerMin: intMin(env.API_RATE_LIMIT_PER_MIN, 60, 1),
+        batchMaxUrls: intMin(env.BATCH_MAX_URLS, 20, 1),
         twitchClientId: env.TWITCH_CLIENT_ID,
         twitchClientSecret: env.TWITCH_CLIENT_SECRET,
         // `||` (not `??`): a copied .env.example leaves these as "", which must

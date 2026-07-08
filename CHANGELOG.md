@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0](https://github.com///compare/v1.2.0...v1.3.0) (2026-07-08)
+
+### Features
+
+* add BaseAdapter with shared linkCard helper ([19a22d8](https://github.com///commit/19a22d812f453cb940d1f8149a9b16b141caed69))
+* add EmbedController for catch-all embed/redirect/preview ([b09cb7a](https://github.com///commit/b09cb7a4b41c1d03ce00e0cc8ef28c9dd6335a1f))
+* add health/oembed/status/proxy controllers ([5ffd80f](https://github.com///commit/5ffd80f2229530c9d38e34595a0904dc45c6766d))
+* add http middleware classes ([3aaed5a](https://github.com///commit/3aaed5af678ab67ebf9afcd7f40ce9da98ef30b3))
+* add HttpClient absorbing shared UA + fetch helpers ([293f4ad](https://github.com///commit/293f4ad4f348519b715696551e7f31b2b1240aed))
+* add injectable Clock service ([c02093c](https://github.com///commit/c02093cda1f0a6c2a8b590722818faf4c1f0cf86))
+* add LandingPage service ([3348d0c](https://github.com///commit/3348d0c750c1c0504cd4babdc56a5b1612d149d0))
+* extract VideoProxy from app route closure ([0d3d4cf](https://github.com///commit/0d3d4cfa038ebfcba3df6a882cff59abbdad82ca))
+* wire container via bootstrap + routes, migrate integration tests to createTestApp ([a503bc8](https://github.com///commit/a503bc8e1b07df9c595e06262f87fe9e05e14137))
+
 ## [1.2.0](https://github.com///compare/v1.1.0...v1.2.0) (2026-07-08)
 
 ### Features

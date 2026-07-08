@@ -21,7 +21,7 @@ function tryDecode(s: string): string | null {
 }
 
 export default class TargetUrl {
-    static parse(pathname: string, search: string): ParsedTarget {
+    public static parse(pathname: string, search: string): ParsedTarget {
         let raw = pathname.replace(/^\/+/, '');
 
         if (raw.includes('%')) {

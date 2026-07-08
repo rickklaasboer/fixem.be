@@ -1,5 +1,5 @@
 import {describe, expect, test} from 'bun:test';
-import TargetUrl, {type ParsedTarget} from '../src/support/TargetUrl';
+import TargetUrl, {type ParsedTarget} from '@/support/TargetUrl';
 
 function ok(pathname: string, search = ''): string {
     const r = TargetUrl.parse(pathname, search);

@@ -80,24 +80,15 @@ export default function createTestApp(overrides: TestAppOverrides = {}): Hono {
     const adapters = overrides.adapters ?? [c.resolve(DummyAdapter)];
     c.registerInstance(AdapterRegistry, new AdapterRegistry(adapters));
 
-    // Resolver isn't container-constructible (its two defaulted numeric params
-    // would be injected as `Number`), so build it explicitly — or take a
-    // caller-supplied fake for the throwing/degraded-resolve tests.
-    c.registerInstance(
-        Resolver,
-        overrides.resolver ??
-            new Resolver(
-                c.resolve(AdapterRegistry),
-                c.resolve(cacheToken),
-                c.resolve(Logger),
-                c.resolve(Clock),
-                c.resolve(Config),
-            ),
-    );
-
     // These singletons capture per-test config or hold mutable state. Without
     // re-registration the child would reuse a globally-cached instance built
     // for an earlier test, so re-register them to force fresh construction.
+    // Resolver also accepts a caller-supplied fake (throwing/degraded tests).
+    if (overrides.resolver) {
+        c.registerInstance(Resolver, overrides.resolver);
+    } else {
+        c.registerSingleton(Resolver);
+    }
     c.registerSingleton(VideoProxy);
     c.registerSingleton(ProxyStreamer);
     c.registerSingleton(ApiAuthMiddleware);

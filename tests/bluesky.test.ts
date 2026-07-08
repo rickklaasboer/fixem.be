@@ -1,7 +1,7 @@
 import {describe, expect, test} from 'bun:test';
-import BlueskyAdapter from '../src/adapters/BlueskyAdapter';
-import HttpClient from '../src/services/HttpClient';
-import type {FetchFn} from '../src/services/HttpClient';
+import BlueskyAdapter from '@/adapters/BlueskyAdapter';
+import HttpClient from '@/services/HttpClient';
+import type {FetchFn} from '@/services/HttpClient';
 import resolveHandle from './fixtures/bluesky/resolve-handle.json';
 import postImages from './fixtures/bluesky/post-images.json';
 import postVideo from './fixtures/bluesky/post-video.json';

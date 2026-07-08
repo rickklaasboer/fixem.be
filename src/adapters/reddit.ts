@@ -210,8 +210,28 @@ function parseOldRedditHtml(html: string, canonical: string): EmbedMetadata {
   };
 }
 
-export function createRedditAdapter(fetchFn: FetchFn = fetch, creds?: RedditCreds): PlatformAdapter {
+// Offloads for the ANONYMOUS reddit fetches (old.reddit HTML + the share-link
+// probe) — reddit's edge 403-blocks many datacenter IP ranges (Hetzner etc.).
+// The OAuth path never uses either (authorized requests aren't IP-blocked, and
+// credentials must not transit a third party).
+interface RedditOpts {
+  // Prefix endpoint: the target URL is appended URL-encoded (same scheme as
+  // INSTAGRAM_PROXY_URL).
+  proxyUrl?: string;
+  // Standard HTTP CONNECT proxy (`http://user:pass@host:port`), passed as
+  // Bun's fetch `proxy` option — for per-GB residential providers.
+  httpProxy?: string;
+}
+
+export function createRedditAdapter(
+  fetchFn: FetchFn = fetch,
+  creds?: RedditCreds,
+  opts?: RedditOpts,
+): PlatformAdapter {
   const getToken = creds ? createTokenManager(fetchFn, creds) : undefined;
+  const viaProxy = (url: string): string =>
+    opts?.proxyUrl ? opts.proxyUrl + encodeURIComponent(url) : url;
+  const proxyInit: { proxy?: string } = opts?.httpProxy ? { proxy: opts.httpProxy } : {};
   return {
     name: "reddit",
     match(url) {
@@ -235,9 +255,13 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch, creds?: RedditCred
         // resolve with credentials set.
         const shareHeaders: Record<string, string> = { "User-Agent": PLATFORM_UA };
         if (getToken) shareHeaders.Authorization = `bearer ${await getToken(signal)}`;
-        const redirect = await f(canonical, {
+        // The probe is proxied only on the anonymous path — with creds the
+        // OAuth-authorized request isn't IP-blocked, and the bearer must not
+        // transit a third-party proxy.
+        const redirect = await f(getToken ? canonical : viaProxy(canonical), {
           headers: shareHeaders,
           redirect: "manual",
+          ...(getToken ? {} : proxyInit),
         });
         let target: URL;
         try {
@@ -252,8 +276,9 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch, creds?: RedditCred
       // anonymous `.json` API is globally disabled (403 + web-app shell), and
       // OAuth creds are approval-gated, so this is the working no-auth path.
       if (!getToken) {
-        const htmlRes = await f(`https://old.reddit.com${new URL(canonical).pathname}`, {
+        const htmlRes = await f(viaProxy(`https://old.reddit.com${new URL(canonical).pathname}`), {
           headers: { "User-Agent": CHROME_UA, Accept: "text/html" },
+          ...proxyInit,
         });
         if (!htmlRes.ok) throw new Error(`reddit ${htmlRes.status}`);
         return parseOldRedditHtml(await htmlRes.text(), canonical);

@@ -85,6 +85,18 @@ describe("loadConfig", () => {
     expect(c.instagram.proxyUrl).toBe("https://proxy.test/?u=");
   });
 
+  test("REDDIT_PROXY_URL is optional: unset/blank → undefined, set → passed through", () => {
+    expect(loadConfig({}).redditProxyUrl).toBeUndefined();
+    expect(loadConfig({ REDDIT_PROXY_URL: "" }).redditProxyUrl).toBeUndefined();
+    expect(loadConfig({ REDDIT_PROXY_URL: "https://proxy.test/?u=" }).redditProxyUrl).toBe("https://proxy.test/?u=");
+  });
+
+  test("REDDIT_HTTP_PROXY is optional: unset/blank → undefined, set → passed through", () => {
+    expect(loadConfig({}).redditHttpProxy).toBeUndefined();
+    expect(loadConfig({ REDDIT_HTTP_PROXY: "" }).redditHttpProxy).toBeUndefined();
+    expect(loadConfig({ REDDIT_HTTP_PROXY: "http://u:p@gw.test:823" }).redditHttpProxy).toBe("http://u:p@gw.test:823");
+  });
+
   test("TIKTOK_REHYDRATION_SCRIPT_ID is overridable, blank falls back", () => {
     expect(loadConfig({ TIKTOK_REHYDRATION_SCRIPT_ID: "__CUSTOM__" }).tiktok.rehydrationScriptId).toBe("__CUSTOM__");
     expect(loadConfig({ TIKTOK_REHYDRATION_SCRIPT_ID: "" }).tiktok.rehydrationScriptId).toBe(

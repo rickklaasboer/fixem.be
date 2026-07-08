@@ -292,6 +292,76 @@ describe("reddit adapter", () => {
     expect(m.image).toBeUndefined();
   });
 
+  test("html: proxyUrl routes the old.reddit fetch through the offload prefix", async () => {
+    const requests: string[] = [];
+    const fetchFn = (async (input: unknown) => {
+      requests.push(String(input));
+      return new Response(oldRedditHtml({ ogImage: "https://i.redd.it/x.jpg" }));
+    }) as unknown as FetchFn;
+    const ad = createRedditAdapter(fetchFn, undefined, { proxyUrl: "https://proxy.example/fetch?u=" });
+    const m = await ad.resolve(new URL("https://www.reddit.com/r/pics/comments/abc123/a_sunset/"));
+    expect(requests[0]).toBe(
+      "https://proxy.example/fetch?u=" +
+        encodeURIComponent("https://old.reddit.com/r/pics/comments/abc123/a_sunset"),
+    );
+    expect(m.kind).toBe("image");
+  });
+
+  test("html: proxyUrl routes the share-link probe through the offload prefix", async () => {
+    const requests: string[] = [];
+    const fetchFn = (async (input: unknown) => {
+      requests.push(String(input));
+      if (requests.length === 1) {
+        return new Response(null, {
+          status: 307,
+          headers: { Location: "https://www.reddit.com/r/pics/comments/abc123/a_sunset/" },
+        });
+      }
+      return new Response(oldRedditHtml({ ogImage: "https://i.redd.it/x.jpg" }));
+    }) as unknown as FetchFn;
+    const ad = createRedditAdapter(fetchFn, undefined, { proxyUrl: "https://proxy.example/fetch?u=" });
+    await ad.resolve(new URL("https://www.reddit.com/r/pics/s/AbCdEf123"));
+    expect(requests[0]).toBe(
+      "https://proxy.example/fetch?u=" +
+        encodeURIComponent("https://www.reddit.com/r/pics/s/AbCdEf123"),
+    );
+  });
+
+  test("html: httpProxy sets Bun's fetch proxy option on the anonymous fetches", async () => {
+    const proxies: (string | undefined)[] = [];
+    const fetchFn = (async (input: unknown, init?: RequestInit & { proxy?: string }) => {
+      proxies.push(init?.proxy);
+      if (String(input).endsWith("/r/pics/s/AbCdEf123")) {
+        return new Response(null, {
+          status: 307,
+          headers: { Location: "https://www.reddit.com/r/pics/comments/abc123/a_sunset/" },
+        });
+      }
+      return new Response(oldRedditHtml({ ogImage: "https://i.redd.it/x.jpg" }));
+    }) as unknown as FetchFn;
+    const ad = createRedditAdapter(fetchFn, undefined, { httpProxy: "http://user:pass@gw.dataimpulse.com:823" });
+    await ad.resolve(new URL("https://www.reddit.com/r/pics/s/AbCdEf123"));
+    // share probe + old.reddit HTML fetch, both through the CONNECT proxy
+    expect(proxies).toEqual([
+      "http://user:pass@gw.dataimpulse.com:823",
+      "http://user:pass@gw.dataimpulse.com:823",
+    ]);
+  });
+
+  test("with creds: httpProxy is NOT applied to the OAuth path", async () => {
+    const proxies: (string | undefined)[] = [];
+    const fetchFn = (async (input: unknown, init?: RequestInit & { proxy?: string }) => {
+      proxies.push(init?.proxy);
+      if (String(input).includes("access_token")) {
+        return new Response(JSON.stringify({ access_token: "tok", expires_in: 3600 }));
+      }
+      return new Response(JSON.stringify(imagePost));
+    }) as unknown as FetchFn;
+    const ad = createRedditAdapter(fetchFn, CREDS, { httpProxy: "http://user:pass@gw.dataimpulse.com:823" });
+    await ad.resolve(new URL("https://www.reddit.com/r/pics/comments/abc123/a_sunset_over_the_sea/"));
+    expect(proxies).toEqual([undefined, undefined]); // token + oauth API, both direct
+  });
+
   test("html: non-OK response throws (resolver degrades)", async () => {
     await expect(
       htmlAdapter("blocked", 403).resolve(new URL("https://www.reddit.com/r/x/comments/y/z/")),

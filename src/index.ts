@@ -23,6 +23,7 @@ const adapters = [
     config.redditClientId && config.redditClientSecret
       ? { clientId: config.redditClientId, clientSecret: config.redditClientSecret }
       : undefined,
+    { proxyUrl: config.redditProxyUrl, httpProxy: config.redditHttpProxy },
   ),
   createBlueskyAdapter(),
   createTwitterAdapter(fetch, config.twitterSyndicationFeatures),

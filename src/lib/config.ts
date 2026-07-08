@@ -19,6 +19,8 @@ export interface Config {
   twitterSyndicationFeatures: string;
   redditClientId?: string;
   redditClientSecret?: string;
+  redditProxyUrl?: string;
+  redditHttpProxy?: string;
   proxySecret: string;
   proxyHostAllowlist: string[];
   proxyMaxConcurrent: number;
@@ -73,6 +75,9 @@ export function loadConfig(
     twitterSyndicationFeatures: env.TWITTER_SYNDICATION_FEATURES || SYNDICATION_FEATURES,
     redditClientId: env.REDDIT_CLIENT_ID,
     redditClientSecret: env.REDDIT_CLIENT_SECRET,
+    // Optional offloads for anonymous reddit fetches; unset means direct fetch.
+    redditProxyUrl: env.REDDIT_PROXY_URL || undefined,
+    redditHttpProxy: env.REDDIT_HTTP_PROXY || undefined,
     proxySecret: env.PROXY_SECRET ?? "",
     proxyHostAllowlist: (env.PROXY_HOST_ALLOWLIST
       ? env.PROXY_HOST_ALLOWLIST.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)

@@ -67,7 +67,7 @@ paths:
         - {name: url, in: query, required: true, schema: {type: string, format: uri}}
       responses:
         '200':
-          description: Platform + canonical URL, or `{platform: none}`.
+          description: "Platform + canonical URL, or `{platform: none}`."
           content:
             application/json:
               schema:
@@ -103,7 +103,7 @@ paths:
         - {name: url, in: query, required: false, schema: {type: string, format: uri}}
       responses:
         '200':
-          description: Adapter outcome payload, or `{ok, redis}` liveness.
+          description: "Adapter outcome payload, or `{ok, redis}` liveness."
           content:
             application/json: {schema: {type: object}}
         '400': {$ref: '#/components/responses/BadRequest'}

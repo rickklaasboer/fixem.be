@@ -20,14 +20,14 @@ describe('GET /openapi.yaml', () => {
         expect(text).toContain('openapi: 3.1.0');
     });
 
-    test('documents exactly the live /api/v1 routes (drift guard)', async () => {
+    test('is valid YAML and documents exactly the live /api/v1 routes (drift guard)', async () => {
         const text = await Bun.file(`${process.cwd()}/openapi.yaml`).text();
-        // Path keys are the only 2-space-indented `/`-prefixed keys in the doc.
-        const documented = new Set(
-            [...text.matchAll(/^ {2}(\/[^\s:]+):/gm)].map((m) => m[1]!),
-        );
+        // Bun.YAML.parse throws on invalid YAML — this is also the parse-validity
+        // guard (the docs site's OpenAPI renderer parses the same file strictly).
+        const spec = Bun.YAML.parse(text) as {paths: Record<string, unknown>};
+        const documented = Object.keys(spec.paths);
         for (const p of API_V1_PATHS) {
-            expect(documented.has(p)).toBe(true);
+            expect(documented).toContain(p);
         }
         // No /api/v1 path documented that the server doesn't serve.
         for (const d of documented) {

@@ -39,6 +39,38 @@ export default class VideoProxy {
     }
 
     /**
+     * Sign `video` into a `/v/<token>` proxy URL, or return `null` when
+     * proxying is disabled, the URL isn't https, or its host isn't
+     * allowlisted (a token there would 403 at /v/). Pure: never mutates
+     * `video`, never logs. Shared by `rewrite()` (HTML path) and the public
+     * API mapper (`PublicMetaRenderer`).
+     */
+    public async signedUrlFor(
+        video: NonNullable<EmbedMetadata['video']>,
+    ): Promise<string | null> {
+        if (!video.proxyHeaders) return null;
+        if (!this.config.proxySecret) return null;
+        let u: URL;
+        try {
+            u = new URL(video.url);
+        } catch {
+            return null;
+        }
+        if (
+            u.protocol !== 'https:' ||
+            !VideoProxy.isHostAllowed(u.hostname, this.config.proxyHostAllowlist)
+        ) {
+            return null;
+        }
+        const token = await this.signer.sign(this.config.proxySecret, {
+            url: video.url,
+            headers: video.proxyHeaders,
+            exp: this.clock.now() + PROXY_TOKEN_TTL_MS,
+        });
+        return `${this.config.publicBaseUrl}/v/${token}`;
+    }
+
+    /**
      * Rewrite `meta.video.url` to a signed `/v/` proxy URL when the video
      * carries `proxyHeaders`, degrading to a link (`dropVideo`) when
      * proxying is disabled or the host isn't https/allowlisted.
@@ -47,40 +79,24 @@ export default class VideoProxy {
         if (!meta.video?.proxyHeaders) return meta;
         // Proxy required but disabled → drop rather than emit an unplayable CDN URL.
         if (!this.config.proxySecret) return this.dropVideo(meta);
-        // The /v/ route only fetches https allowlisted hosts, so a video whose host
-        // isn't allowlisted would mint a token that always 403s — a player that
-        // fails to load is worse than an honest thumbnail/link. Degrade + warn so
-        // allowlist drift is visible instead of silently broken in Discord.
-        let u: URL;
-        try {
-            u = new URL(meta.video.url);
-        } catch {
-            return this.dropVideo(meta);
-        }
-        if (
-            u.protocol !== 'https:' ||
-            !VideoProxy.isHostAllowed(
-                u.hostname,
-                this.config.proxyHostAllowlist,
-            )
-        ) {
+        const signed = await this.signedUrlFor(meta.video);
+        // proxySecret is set, so a null here means the /v/ route only fetches https
+        // allowlisted hosts and this one isn't — a minted token would always 403. A
+        // player that fails to load is worse than an honest thumbnail/link. Degrade +
+        // warn so allowlist drift is visible instead of silently broken in Discord.
+        if (!signed) {
             this.logger.warn(
-                {host: u.hostname},
+                {url: meta.video.url},
                 'video host not proxyable (not https/allowlisted) — degrading to link',
             );
             return this.dropVideo(meta);
         }
-        const token = await this.signer.sign(this.config.proxySecret, {
-            url: meta.video.url,
-            headers: meta.video.proxyHeaders,
-            exp: this.clock.now() + PROXY_TOKEN_TTL_MS,
-        });
         const {proxyHeaders, ...vid} = meta.video;
         return {
             ...meta,
             video: {
                 ...vid,
-                url: `${this.config.publicBaseUrl}/v/${token}`,
+                url: signed,
             },
         };
     }

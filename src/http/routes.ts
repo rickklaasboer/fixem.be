@@ -4,6 +4,7 @@ import {container} from '@/container';
 import HealthController from '@/http/controllers/HealthController';
 import OembedController from '@/http/controllers/OembedController';
 import ApiV1Controller from '@/http/controllers/ApiV1Controller';
+import OpenApiController from '@/http/controllers/OpenApiController';
 import ProxyController from '@/http/controllers/ProxyController';
 import EmbedController from '@/http/controllers/EmbedController';
 import ApiAuthMiddleware from '@/http/middleware/ApiAuthMiddleware';
@@ -24,6 +25,7 @@ export default function routes(
     const health = di.resolve(HealthController);
     const oembed = di.resolve(OembedController);
     const api = di.resolve(ApiV1Controller);
+    const openapi = di.resolve(OpenApiController);
     const proxy = di.resolve(ProxyController);
     const embed = di.resolve(EmbedController);
     const apiAuth = di.resolve(ApiAuthMiddleware);
@@ -32,6 +34,7 @@ export default function routes(
 
     server.get('/', (c) => health.index(c));
     server.get('/healthz', (c) => health.healthz(c));
+    server.get('/openapi.yaml', (c) => openapi.spec(c));
     server.get('/oembed', rateLimit.handle, (c) => oembed.show(c));
 
     // Public API v1: bearer-gated, then key-bucketed rate limit.

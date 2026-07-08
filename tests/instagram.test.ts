@@ -284,35 +284,106 @@ describe("instagram adapter", () => {
     expect(recorded[0]!.url).toBe(proxyUrl + encodeURIComponent(GRAPHQL_URL));
   });
 
-  test("session cookie is sent on the GraphQL call with mirrored X-CSRFToken", async () => {
+  // --- Authenticated mobile private-API path (cookie present) ---
+
+  // Routes the mobile media/info call to a mobile-shaped item; graphql throws if hit.
+  function mobileFetch(item: unknown, recorded?: Recorded[]): FetchFn {
+    return (async (input: unknown, init?: RequestInit) => {
+      recorded?.push({ url: String(input), body: init?.body?.toString(), headers: new Headers(init?.headers) });
+      if (String(input).includes("i.instagram.com")) {
+        return new Response(JSON.stringify({ items: [item] }), { status: 200 });
+      }
+      throw new Error("graphql should not be called when the mobile API resolves");
+    }) as unknown as FetchFn;
+  }
+
+  test("with a cookie, the mobile API is used and carries the cookie + X-CSRFToken", async () => {
     const recorded: Recorded[] = [];
-    const ad = createInstagramAdapter(fakeFetch({ recorded, body: videoFixture }), {
+    const item = {
+      media_type: 1,
+      user: { username: "janedoe" },
+      caption: { text: "hi" },
+      image_versions2: { candidates: [{ url: "https://scontent.cdninstagram.com/mob.jpg", width: 1080, height: 1080 }] },
+    };
+    const ad = createInstagramAdapter(mobileFetch(item, recorded), {
       ...INSTAGRAM_DEFAULTS,
       cookie: "sessionid=SECRET_SESSION; csrftoken=TOKEN123; ds_user_id=42",
     });
-    await ad.resolve(P_URL);
+    const m = await ad.resolve(P_URL);
+    // request went to the mobile endpoint with the cookie + mirrored csrf
+    expect(recorded[0]!.url).toContain("i.instagram.com/api/v1/media/");
     expect(recorded[0]!.headers.get("Cookie")).toBe("sessionid=SECRET_SESSION; csrftoken=TOKEN123; ds_user_id=42");
     expect(recorded[0]!.headers.get("X-CSRFToken")).toBe("TOKEN123");
+    // resolved from the mobile item, not a login-wall card
+    expect(m.kind).toBe("image");
+    expect(m.title).toBe("@janedoe");
+    expect(m.image?.url).toBe("https://scontent.cdninstagram.com/mob.jpg");
   });
 
-  test("no Cookie header when no session cookie is configured", async () => {
-    const recorded: Recorded[] = [];
-    await createInstagramAdapter(fakeFetch({ recorded, body: videoFixture })).resolve(P_URL);
-    expect(recorded[0]!.headers.get("Cookie")).toBeNull();
-    expect(recorded[0]!.headers.get("X-CSRFToken")).toBeNull();
-  });
-
-  test("session cookie NEVER leaks into video.proxyHeaders (must not reach the /v/ token)", async () => {
-    const ad = createInstagramAdapter(fakeFetch({ body: videoFixture }), {
-      ...INSTAGRAM_DEFAULTS,
-      cookie: "sessionid=SUPER_SECRET",
-    });
+  test("mobile API: video item → proxied video, poster, dims", async () => {
+    const item = {
+      media_type: 2,
+      user: { username: "vidguy" },
+      original_width: 720,
+      original_height: 1280,
+      image_versions2: { candidates: [{ url: "https://scontent.cdninstagram.com/poster.jpg" }] },
+      video_versions: [{ url: "https://scontent.cdninstagram.com/v.mp4", width: 720, height: 1280 }],
+    };
+    const ad = createInstagramAdapter(mobileFetch(item), { ...INSTAGRAM_DEFAULTS, cookie: "sessionid=X" });
     const m = await ad.resolve(P_URL);
-    expect(m.video?.proxyHeaders).toBeDefined();
+    expect(m.kind).toBe("video");
+    expect(m.video?.url).toBe("https://scontent.cdninstagram.com/v.mp4");
+    expect(m.video?.width).toBe(720);
+    expect(m.image?.url).toBe("https://scontent.cdninstagram.com/poster.jpg");
+    expect(m.video?.proxyHeaders?.["User-Agent"]).toBe(CHROME_UA);
+  });
+
+  test("mobile API: carousel (media_type 8) → first child + count", async () => {
+    const item = {
+      media_type: 8,
+      user: { username: "carol" },
+      caption: { text: "dump" },
+      carousel_media: [
+        { media_type: 1, image_versions2: { candidates: [{ url: "https://scontent.cdninstagram.com/c1.jpg" }] } },
+        { media_type: 1, image_versions2: { candidates: [{ url: "https://scontent.cdninstagram.com/c2.jpg" }] } },
+        { media_type: 1, image_versions2: { candidates: [{ url: "https://scontent.cdninstagram.com/c3.jpg" }] } },
+      ],
+    };
+    const m = await createInstagramAdapter(mobileFetch(item), { ...INSTAGRAM_DEFAULTS, cookie: "sessionid=X" }).resolve(P_URL);
+    expect(m.image?.url).toBe("https://scontent.cdninstagram.com/c1.jpg");
+    expect(m.description).toBe("dump 📷 3");
+  });
+
+  test("mobile cookie NEVER leaks into video.proxyHeaders (must not reach the /v/ token)", async () => {
+    const item = {
+      media_type: 2,
+      user: { username: "x" },
+      video_versions: [{ url: "https://scontent.cdninstagram.com/v.mp4" }],
+    };
+    const ad = createInstagramAdapter(mobileFetch(item), { ...INSTAGRAM_DEFAULTS, cookie: "sessionid=SUPER_SECRET" });
+    const m = await ad.resolve(P_URL);
     const serialized = JSON.stringify(m.video?.proxyHeaders);
     expect(serialized).not.toContain("SUPER_SECRET");
     expect(serialized).not.toContain("sessionid");
     expect(m.video?.proxyHeaders?.Cookie).toBeUndefined();
+  });
+
+  test("no mobile call / no Cookie header when no session cookie is configured", async () => {
+    const recorded: Recorded[] = [];
+    await createInstagramAdapter(fakeFetch({ recorded, body: videoFixture })).resolve(P_URL);
+    expect(recorded[0]!.url).not.toContain("i.instagram.com"); // graphql, not mobile
+    expect(recorded[0]!.headers.get("Cookie")).toBeNull();
+  });
+
+  test("cookie set but mobile API fails → falls through to snapsave/degrade (no crash)", async () => {
+    // mobile returns no items → null; no snapsave → login-wall degrade
+    const fetchFn = (async (input: unknown) => {
+      if (String(input).includes("i.instagram.com")) return new Response(JSON.stringify({ items: [] }), { status: 200 });
+      return new Response(JSON.stringify({ status: "fail" }), { status: 200 });
+    }) as unknown as FetchFn;
+    const m = await createInstagramAdapter(fetchFn, { ...INSTAGRAM_DEFAULTS, cookie: "sessionid=X" }).resolve(P_URL);
+    expect(m.kind).toBe("link");
+    expect(m.description).toContain("login wall");
   });
 
   test("snapsave fallback fires when our own fetch is login-walled (opt-in)", async () => {

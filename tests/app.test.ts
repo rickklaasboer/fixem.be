@@ -164,12 +164,19 @@ describe("routes", () => {
 test("reddit URL routes through app with fixture-backed adapter", async () => {
   const { createRedditAdapter } = await import("../src/adapters/reddit");
   const imagePost = (await import("./fixtures/reddit/image-post.json")).default;
-  const fetchFn = (async () => new Response(JSON.stringify(imagePost))) as unknown as typeof fetch;
+  // With credentials the adapter uses the OAuth JSON path; serve the token then
+  // the fixture. (The credential-less path scrapes old.reddit HTML instead.)
+  const fetchFn = (async (input: unknown) => {
+    if (String(input).includes("access_token")) {
+      return new Response(JSON.stringify({ access_token: "tok", expires_in: 3600 }));
+    }
+    return new Response(JSON.stringify(imagePost));
+  }) as unknown as typeof fetch;
   const config = loadConfig({});
   const logger = createLogger({ write: () => {} });
   const cache = new MemoryCache();
   const resolver = new Resolver({
-    registry: new AdapterRegistry([createRedditAdapter(fetchFn)]),
+    registry: new AdapterRegistry([createRedditAdapter(fetchFn, { clientId: "id", clientSecret: "sec" })]),
     cache,
     logger,
     ttlSeconds: 60,

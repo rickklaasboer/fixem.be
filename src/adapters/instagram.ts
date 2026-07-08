@@ -45,6 +45,39 @@ export const INSTAGRAM_DEFAULTS: InstagramConfig = {
   friendlyName: "PolarisPostActionLoadPostQueryQuery",
 };
 
+// --- Authenticated mobile private-API (i.instagram.com) types + helpers ---
+// With a session cookie, media/<id>/info is far more stable than the web GraphQL
+// (which needs a doc_id Instagram rotates constantly). Preferred when a cookie is set.
+const MOBILE_API = "https://i.instagram.com/api/v1/media";
+const SHORTCODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+// Instagram shortcodes are base64url of the numeric media pk.
+function shortcodeToMediaId(sc: string): string {
+  let id = 0n;
+  for (const c of sc) {
+    const v = SHORTCODE_ALPHABET.indexOf(c);
+    if (v < 0) return "";
+    id = id * 64n + BigInt(v);
+  }
+  return id.toString();
+}
+
+interface MobileImage {
+  url?: string;
+  width?: number;
+  height?: number;
+}
+interface MobileItem {
+  media_type?: number; // 1=image, 2=video, 8=carousel
+  user?: { username?: string };
+  caption?: { text?: string } | null;
+  original_width?: number;
+  original_height?: number;
+  image_versions2?: { candidates?: MobileImage[] };
+  video_versions?: MobileImage[];
+  carousel_media?: MobileItem[];
+}
+
 interface MediaNode {
   __typename?: string;
   display_url?: string;
@@ -117,10 +150,86 @@ function loginWallEmbed(canonical: string): EmbedMetadata {
   };
 }
 
+// Map one mobile item (post or carousel child) to kind + image/video.
+function pickMobileMedia(item: MobileItem): Pick<EmbedMetadata, "kind" | "image" | "video"> {
+  const w = item.original_width;
+  const h = item.original_height;
+  const video = item.video_versions?.[0];
+  if (video?.url) {
+    const poster = item.image_versions2?.candidates?.[0]?.url;
+    return {
+      kind: "video",
+      video: {
+        url: video.url,
+        width: video.width ?? w,
+        height: video.height ?? h,
+        mimeType: "video/mp4",
+        proxyHeaders: MEDIA_PROXY_HEADERS, // cookie NEVER goes here (not in /v/ token)
+      },
+      image: poster ? { url: poster } : undefined,
+    };
+  }
+  const img = item.image_versions2?.candidates?.[0];
+  if (img?.url) return { kind: "image", image: { url: img.url, width: img.width ?? w, height: img.height ?? h } };
+  return { kind: "link" };
+}
+
+function metaFromMobile(item: MobileItem, canonical: string): EmbedMetadata {
+  const username = item.user?.username ?? "instagram";
+  const descParts: string[] = [];
+  const caption = (item.caption?.text ?? "").trim();
+  if (caption) descParts.push(truncate(caption, 300));
+  let node = item;
+  if (item.media_type === 8 && item.carousel_media && item.carousel_media.length > 0) {
+    node = item.carousel_media[0]!;
+    if (item.carousel_media.length > 1) descParts.push(`📷 ${item.carousel_media.length}`);
+  }
+  const picked = pickMobileMedia(node);
+  const hasMedia = picked.kind === "video" || picked.kind === "image";
+  return {
+    kind: picked.kind,
+    title: `@${username}`,
+    description: descParts.length ? descParts.join(" ") : undefined,
+    author: { name: `@${username}`, url: `https://www.instagram.com/${username}` },
+    siteName: "Instagram",
+    themeColor: "#E1306C",
+    image: picked.image,
+    video: picked.video,
+    nsfw: false,
+    ttlSeconds: hasMedia ? MEDIA_TTL_SECONDS : undefined,
+    originalUrl: canonical,
+  };
+}
+
 export function createInstagramAdapter(
   fetchFn: FetchFn = fetch,
   cfg: InstagramConfig = INSTAGRAM_DEFAULTS,
 ): PlatformAdapter {
+  // Authenticated path: the mobile private API (needs a session cookie). Returns
+  // null on any failure so resolve() can fall through to the other strategies.
+  async function fetchMobileMedia(code: string): Promise<MobileItem | null> {
+    if (!cfg.cookie) return null;
+    const mediaId = shortcodeToMediaId(code);
+    if (!mediaId) return null;
+    try {
+      const csrf = cfg.cookie.match(/csrftoken=([^;]+)/)?.[1] ?? "";
+      const res = await fetchFn(`${MOBILE_API}/${mediaId}/info/`, {
+        headers: {
+          "User-Agent": "Instagram 269.0.0.18.75 Android",
+          "X-IG-App-ID": cfg.appId,
+          "X-CSRFToken": csrf,
+          Cookie: cfg.cookie, // never logged; never enters the /v/ token
+          Accept: "*/*",
+        },
+      });
+      if (!res.ok) return null;
+      const j = (await res.json()) as { items?: MobileItem[] };
+      return j.items?.[0] ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   // Fetch + parse the post payload. Returns null (→ degrade) for every
   // reachable-but-empty outcome — login wall (status:"fail" / require_login),
   // a non-JSON HTML wall, missing media, or a thrown/failed transport. We prefer
@@ -188,6 +297,12 @@ export function createInstagramAdapter(
       const code = codeOf(url);
       if (!code) throw new Error("instagram: not a post URL");
       const canonical = `https://www.instagram.com/p/${code}`;
+
+      // Preferred authenticated path: the mobile private API (stable, no doc_id).
+      if (cfg.cookie) {
+        const mobile = await fetchMobileMedia(code);
+        if (mobile) return metaFromMobile(mobile, canonical);
+      }
 
       const media = await fetchMedia(code);
       if (!media) {

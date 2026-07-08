@@ -178,11 +178,24 @@ describe('routes', () => {
         expect((await get(makeApp(), '/oembed', DISCORD_UA)).status).toBe(404);
     });
 
-    test('GET /status/adapter reports media JSON for a matched URL', async () => {
-        const res = await get(
-            makeApp(),
-            `/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`,
-            BROWSER_UA,
+    const API_KEY = 'test-status-key';
+    const apiCfg = () => loadConfig({STATUS_API_KEY: API_KEY});
+    const apiGet = (
+        app: ReturnType<typeof makeApp>,
+        path: string,
+        key: string | null = API_KEY,
+    ) =>
+        app.request(path, {
+            headers: {
+                'User-Agent': BROWSER_UA,
+                ...(key === null ? {} : {'X-Api-Key': key}),
+            },
+        });
+
+    test('GET /api/status/adapter reports media JSON for a matched URL', async () => {
+        const res = await apiGet(
+            makeApp({config: apiCfg()}),
+            `/api/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`,
         );
         expect(res.status).toBe(200);
         const body = (await res.json()) as Record<string, unknown>;
@@ -192,11 +205,10 @@ describe('routes', () => {
         expect(body.hasMedia).toBe(true);
     });
 
-    test('GET /status/adapter reports no-adapter for an unmatched URL', async () => {
-        const res = await get(
-            makeApp(),
-            `/status/adapter?url=${encodeURIComponent('https://unknown-platform.dev/x')}`,
-            BROWSER_UA,
+    test('GET /api/status/adapter reports no-adapter for an unmatched URL', async () => {
+        const res = await apiGet(
+            makeApp({config: apiCfg()}),
+            `/api/status/adapter?url=${encodeURIComponent('https://unknown-platform.dev/x')}`,
         );
         expect(res.status).toBe(200);
         const body = (await res.json()) as Record<string, unknown>;
@@ -204,7 +216,7 @@ describe('routes', () => {
         expect(body.hasMedia).toBe(false);
     });
 
-    test('GET /status/adapter reports degraded (no media) when the adapter fails', async () => {
+    test('GET /api/status/adapter reports degraded (no media) when the adapter fails', async () => {
         const failing = {
             name: 'broken',
             match: (u: URL) => u.hostname === 'broken.test',
@@ -220,10 +232,9 @@ describe('routes', () => {
             ttlSeconds: 60,
             timeoutMs: 100,
         });
-        const res = await get(
-            makeApp({resolver}),
-            `/status/adapter?url=${encodeURIComponent('https://broken.test/post/1')}`,
-            BROWSER_UA,
+        const res = await apiGet(
+            makeApp({config: apiCfg(), resolver}),
+            `/api/status/adapter?url=${encodeURIComponent('https://broken.test/post/1')}`,
         );
         expect(res.status).toBe(200);
         const body = (await res.json()) as Record<string, unknown>;
@@ -232,18 +243,27 @@ describe('routes', () => {
         expect(body.hasMedia).toBe(false);
     });
 
-    test('GET /status/adapter 400s for a missing url', async () => {
-        const res = await get(makeApp(), '/status/adapter', BROWSER_UA);
+    test('GET /api/status/adapter 400s for a missing url', async () => {
+        const res = await apiGet(
+            makeApp({config: apiCfg()}),
+            '/api/status/adapter',
+        );
         expect(res.status).toBe(400);
     });
 
-    test('status/adapter is rate limited for browsers, crawlers exempt', async () => {
-        const config = loadConfig({RATE_LIMIT_PER_MIN: '1'});
-        const app = makeApp({config});
-        const path = `/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`;
-        expect((await get(app, path, BROWSER_UA)).status).toBe(200);
-        expect((await get(app, path, BROWSER_UA)).status).toBe(429);
-        expect((await get(app, path, DISCORD_UA)).status).toBe(200); // crawler unaffected
+    test('/api/* requires a valid X-Api-Key', async () => {
+        const app = makeApp({config: apiCfg()});
+        const path = `/api/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`;
+        expect((await apiGet(app, path, null)).status).toBe(401); // missing
+        expect((await apiGet(app, path, 'wrong-key')).status).toBe(401); // wrong
+        expect((await apiGet(app, path, API_KEY)).status).toBe(200); // valid
+    });
+
+    test('/api/* is closed (404) when STATUS_API_KEY is not configured', async () => {
+        // default makeApp() sets no STATUS_API_KEY → the API surface is disabled.
+        const path = `/api/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`;
+        expect((await apiGet(makeApp(), path, API_KEY)).status).toBe(404);
+        expect((await apiGet(makeApp(), path, null)).status).toBe(404);
     });
 
     test('browser requests are rate limited, crawlers exempt', async () => {

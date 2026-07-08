@@ -16,6 +16,7 @@ import {
 import {renderOembed} from './render/oembed';
 import {mountProxy, isHostAllowed} from './proxy';
 import {signProxyToken} from './lib/proxy-sign';
+import {secretsMatch} from './lib/api-auth';
 import type {EmbedMetadata} from './adapters/types';
 
 export interface AppDeps {
@@ -111,22 +112,25 @@ export function buildApp(deps: AppDeps): Hono {
         return c.json(renderOembed(outcome.meta, config.publicBaseUrl));
     });
 
+    // Authenticated API surface. Requires an X-Api-Key header matching
+    // STATUS_API_KEY (a random secret, like PROXY_SECRET). With no key configured
+    // the whole /api/* namespace is closed with 404, so it is never reachable
+    // unauthenticated — safe to leave off the public internet by default.
+    app.use('/api/*', async (c, next) => {
+        if (!config.statusApiKey) return c.json({error: 'not found'}, 404);
+        const provided = c.req.header('X-Api-Key') ?? '';
+        if (!(await secretsMatch(provided, config.statusApiKey)))
+            return c.json({error: 'unauthorized'}, 401);
+        await next();
+    });
+
     // Machine-readable adapter health for status monitoring (Gatus et al.).
     // Mirrors /preview/ but as single-line JSON so uptime checkers can assert on
     // it with JSONPath — glob/pattern matchers can't reliably match the
     // multi-line /preview/ HTML. Never throws (resolve() is guaranteed safe);
     // every matched, well-formed URL returns 200 with an outcome the checker
     // discriminates on (e.g. hasMedia == true, or platform == "threads").
-    app.get('/status/adapter', async (c) => {
-        if (!isCrawler(c.req.header('User-Agent'), config.extraCrawlerUas)) {
-            const hits = await rateLimitStore.hit(
-                clientIp(c.req.raw.headers),
-                60_000,
-                now(),
-            );
-            if (hits > config.rateLimitPerMin)
-                return c.text('rate limited, try again shortly', 429);
-        }
+    app.get('/api/status/adapter', async (c) => {
         const raw = c.req.query('url');
         if (!raw) return c.json({error: 'unknown url'}, 400);
         let url: URL;

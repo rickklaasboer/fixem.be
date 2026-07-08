@@ -1,0 +1,169 @@
+# Gatus status-monitoring config for fixem.be.
+#
+# Runs as a sidecar in compose.prod.yaml. Gatus reaches the app by its compose
+# service name (`app`) over the internal Docker network, so adapter checks never
+# leave the host. The dashboard binds to 127.0.0.1:8080 — front it with your
+# reverse proxy for a public status page (e.g. status.fixem.be).
+#
+# Secrets: only the Discord webhook is injected from the environment
+# (${GATUS_DISCORD_WEBHOOK_URL}, set in .env). Test URLs below are public and
+# non-secret — edit them here to change what gets monitored.
+
+ui:
+    title: 'fixem.be — status'
+    header: 'fixem.be'
+
+storage:
+    type: sqlite
+    path: /data/data.db # persisted via the gatus-data volume
+
+alerting:
+    discord:
+        webhook-url: '${GATUS_DISCORD_WEBHOOK_URL}'
+        # Applied to every endpoint that lists a `discord` alert unless it
+        # overrides these. Liveness (1m interval) debounces short blips.
+        default-alert:
+            failure-threshold: 3 # 3 consecutive 1m fails (~3m) before alerting
+            success-threshold: 2
+            send-on-resolved: true
+
+endpoints:
+    # ---------------------------------------------------------------------
+    # Liveness — fast, cheap, no upstream platform calls.
+    # ---------------------------------------------------------------------
+    - name: app
+      group: liveness
+      url: 'http://app:3000/healthz'
+      interval: 1m
+      conditions:
+          - '[STATUS] == 200'
+          - '[BODY].ok == true'
+          - '[BODY].redis == true'
+      alerts:
+          - type: discord
+
+    - name: public-site
+      group: liveness
+      # Full public path: Cloudflare -> reverse proxy -> app. Also validates TLS.
+      url: 'https://fixem.be/healthz'
+      interval: 1m
+      conditions:
+          - '[STATUS] == 200'
+          - '[BODY].ok == true'
+          - '[CERTIFICATE_EXPIRATION] > 240h'
+      alerts:
+          - type: discord
+
+    # ---------------------------------------------------------------------
+    # Adapters — genuine end-to-end resolve via the /preview/ debug hatch.
+    #
+    # Interval is 4h to match CACHE_TTL_SECONDS (14400s): a shorter interval
+    # would just re-validate the cached embed instead of re-fetching upstream.
+    #
+    # "media platforms" are healthy when the adapter produced real media —
+    # the /preview/ report renders <img class="media"> or <video class="media">.
+    # A degrade-to-link renders class="nomedia" instead, so the check fails.
+    #
+    # A single failed 4h check is already meaningful, so these alert on the
+    # first failure (failure-threshold: 1) rather than the 1m default of 3.
+    # ---------------------------------------------------------------------
+    - name: reddit
+      group: adapters
+      url: 'http://app:3000/preview/https://www.reddit.com/r/pics/comments/haucpf/ive_found_a_few_funny_memories_during_lockdown/'
+      interval: 4h
+      conditions:
+          - '[STATUS] == 200'
+          - '[BODY] == pattern(*class="media"*)'
+          - '[RESPONSE_TIME] < 15000'
+      alerts:
+          - type: discord
+            failure-threshold: 1
+
+    - name: bluesky
+      group: adapters
+      # NOTE: verify this post actually carries an image on first deploy (see
+      # README "Status monitoring"). Swap for another @bsky.app image post if not.
+      url: 'http://app:3000/preview/https://bsky.app/profile/bsky.app/post/3m5yqc2is5s2q'
+      interval: 4h
+      conditions:
+          - '[STATUS] == 200'
+          - '[BODY] == pattern(*class="media"*)'
+          - '[RESPONSE_TIME] < 15000'
+      alerts:
+          - type: discord
+            failure-threshold: 1
+
+    - name: twitter
+      group: adapters
+      # Ellen's Oscar selfie — iconic image tweet, effectively never deleted.
+      url: 'http://app:3000/preview/https://x.com/TheEllenShow/status/440322224407314432'
+      interval: 4h
+      conditions:
+          - '[STATUS] == 200'
+          - '[BODY] == pattern(*class="media"*)'
+          - '[RESPONSE_TIME] < 15000'
+      alerts:
+          - type: discord
+            failure-threshold: 1
+
+    - name: instagram
+      group: adapters
+      # World-record egg — most-liked IG post, extremely stable. Requires
+      # INSTAGRAM_COOKIE in prod (confirmed set) for the media path. If you ever
+      # run IG cookieless, swap the media condition for the matched-only one used
+      # by `threads` below, since it will degrade by design.
+      url: 'http://app:3000/preview/https://www.instagram.com/p/BsOGulcndj-/'
+      interval: 4h
+      conditions:
+          - '[STATUS] == 200'
+          - '[BODY] == pattern(*class="media"*)'
+          - '[RESPONSE_TIME] < 15000'
+      alerts:
+          - type: discord
+            failure-threshold: 1
+
+    - name: tiktok
+      group: adapters
+      # Zach King "Magic Ride" — most-viewed TikTok. Inline video is streamed via
+      # /v/, so this also implicitly checks that PROXY_SECRET is set (else the
+      # video degrades and class="media" disappears).
+      url: 'http://app:3000/preview/https://www.tiktok.com/@zachking/video/7095025543627705643'
+      interval: 4h
+      conditions:
+          - '[STATUS] == 200'
+          - '[BODY] == pattern(*class="media"*)'
+          - '[RESPONSE_TIME] < 15000'
+      alerts:
+          - type: discord
+            failure-threshold: 1
+
+    - name: threads
+      group: adapters
+      # Threads degrades by design from a datacenter IP (Meta bot-challenge), so
+      # "healthy" means the code path is alive and the adapter still matches —
+      # NOT that it returned media. The post content is irrelevant here; only the
+      # URL shape (/@user/post/<code>) must stay valid.
+      url: 'http://app:3000/preview/https://www.threads.net/@zuck/post/C8kQXNiRTFa'
+      interval: 4h
+      conditions:
+          - '[STATUS] == 200'
+          - '[BODY] == pattern(*<b>threads</b>*)'
+      alerts:
+          - type: discord
+            failure-threshold: 1
+
+    # Twitch clips get deleted/expire often, so there is no stable public clip to
+    # ship as a default. Pick a clip from a big, always-active channel, drop its
+    # URL below, and uncomment. Clip MP4s play direct (no /v/), so the media
+    # condition applies as-is.
+    # - name: twitch
+    #   group: adapters
+    #   url: 'http://app:3000/preview/https://clips.twitch.tv/<REAL_CLIP_SLUG>'
+    #   interval: 4h
+    #   conditions:
+    #       - '[STATUS] == 200'
+    #       - '[BODY] == pattern(*class="media"*)'
+    #       - '[RESPONSE_TIME] < 15000'
+    #   alerts:
+    #       - type: discord
+    #         failure-threshold: 1

@@ -268,6 +268,49 @@ and can break the tags crawlers parse. Leave `User-Agent` pass-through on.
 
 ---
 
+## Status monitoring
+
+`compose.prod.yaml` ships an optional [Gatus](https://github.com/TwiN/gatus)
+sidecar (`gatus` service) that watches the deployment:
+
+- **Liveness** (every minute): `GET /healthz` (app + Redis) and the full public
+  path `https://fixem.be/healthz` (also checks the TLS cert isn't near expiry).
+- **Adapters** (every 4 hours): one real resolve per platform through the
+  `/preview/` hatch. The 4h interval matches `CACHE_TTL_SECONDS` so each run is a
+  genuine upstream re-fetch rather than a cached re-validation. A check passes
+  when the adapter still produces real media; if a platform changes and the embed
+  degrades to a link, the check goes red. Threads is checked for a live code path
+  only, since it degrades by design from a datacenter IP.
+
+Set `GATUS_DISCORD_WEBHOOK_URL` in `.env` to get Discord alerts on
+failure/recovery (blank = dashboard only). The dashboard binds to
+`127.0.0.1:8080`; front it with your reverse proxy for a public status page
+(e.g. `status.fixem.be` → `127.0.0.1:8080`).
+
+The monitored URLs live in `gatus/config.yaml` — they're stable, high-profile
+public posts. Because upstream posts can be deleted, verify each is green after
+first deploy and swap any that aren't:
+
+```bash
+# On the VPS, from the compose directory — confirm each adapter returns media
+# (or, for threads, a live code path) BEFORE relying on alerts:
+for u in \
+  "https://www.reddit.com/r/pics/comments/haucpf/ive_found_a_few_funny_memories_during_lockdown/" \
+  "https://bsky.app/profile/bsky.app/post/3m5yqc2is5s2q" \
+  "https://x.com/TheEllenShow/status/440322224407314432" \
+  "https://www.instagram.com/p/BsOGulcndj-/" \
+  "https://www.tiktok.com/@zachking/video/7095025543627705643" ; do
+  printf '%s -> ' "$u"
+  curl -s "http://127.0.0.1:3000/preview/$u" | grep -q 'class="media"' && echo OK || echo "NO MEDIA — swap"
+done
+```
+
+**Twitch** is left commented out in `gatus/config.yaml`: clips get deleted or
+expire, so there's no stable default. Drop in a clip URL from a big, always-active
+channel and uncomment the block to monitor it.
+
+---
+
 ## Supported platforms
 
 | Platform | Coverage |

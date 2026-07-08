@@ -1,10 +1,10 @@
 import {describe, expect, test} from 'bun:test';
-import {createLogger} from '../src/lib/logger';
+import Logger from '@/services/Logger';
 
 describe('logger', () => {
     test('writes one JSON line with level, msg, fields, time', () => {
         const lines: string[] = [];
-        const log = createLogger({write: (l) => void lines.push(l)});
+        const log = new Logger({write: (l) => void lines.push(l)});
         log.info({platform: 'reddit', cache: 'hit'}, 'resolved');
         expect(lines.length).toBe(1);
         const parsed = JSON.parse(lines[0]!);
@@ -17,7 +17,7 @@ describe('logger', () => {
 
     test('warn and error levels', () => {
         const lines: string[] = [];
-        const log = createLogger({write: (l) => void lines.push(l)});
+        const log = new Logger({write: (l) => void lines.push(l)});
         log.warn({}, 'w');
         log.error({}, 'e');
         expect(JSON.parse(lines[0]!).level).toBe('warn');

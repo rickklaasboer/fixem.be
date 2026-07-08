@@ -144,6 +144,7 @@ and edit as needed; every value has a sane default (see `src/lib/config.ts`).
 | `TIKTOK_MOBILE_API_HOST` / `TIKTOK_IID` / `TIKTOK_DEVICE_ID` | *(pinned)* | TikTok public web-client constants. Override **only** if TikTok rotates them; the pinned defaults live in `src/adapters/tiktok.ts`. |
 | `INSTAGRAM_DOC_ID` / `INSTAGRAM_APP_ID` / `INSTAGRAM_FRIENDLY_NAME` | *(pinned)* | Instagram public web-client constants. Override **only** if Meta rotates them; the pinned defaults live in `src/adapters/instagram.ts`. |
 | `INSTAGRAM_PROXY_URL` | *(empty)* | Optional residential-proxy offload prefix. Instagram is usually blocked from datacenter IPs; the target URL is appended (URL-encoded) to this prefix. Blank = direct fetch (which typically hits a login wall from a datacenter). |
+| `INSTAGRAM_COOKIE` | *(empty)* | Optional logged-in session cookie (use a **burner** — IG bans scraping accounts) to authenticate past the login wall. Minimum `sessionid=…`; add `csrftoken`/`ds_user_id` for fewer challenges. A full account credential: never logged, never placed in `/v/` tokens, gitignored. Expect expiry/bans — a rotation treadmill. |
 
 ### Redis outages degrade gracefully
 

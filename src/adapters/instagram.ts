@@ -27,6 +27,12 @@ export interface InstagramConfig {
   appId: string;
   friendlyName: string;
   proxyUrl?: string;
+  // Optional logged-in session cookie (a burner's `sessionid=...`, ideally with
+  // `csrftoken`/`ds_user_id`). When set, the GraphQL call authenticates and walks
+  // past the login wall. SECURITY: this is a full account credential — it is only
+  // sent on the metadata request, is never logged, and never enters the /v/ proxy
+  // token (media replays on its own signed URL). Burners get banned; expect churn.
+  cookie?: string;
 }
 
 export const INSTAGRAM_DEFAULTS: InstagramConfig = {
@@ -123,16 +129,24 @@ export function createInstagramAdapter(
 
     let text: string;
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": CHROME_UA,
+        Origin: "https://www.instagram.com",
+        "X-IG-App-ID": cfg.appId,
+        "X-FB-Friendly-Name": cfg.friendlyName,
+        "X-ASBD-ID": ASBD_ID,
+      };
+      if (cfg.cookie) {
+        // Authenticated read: send the session cookie, and mirror its csrftoken
+        // into X-CSRFToken (Instagram requires the match on POST). Never logged.
+        headers.Cookie = cfg.cookie;
+        const csrf = cfg.cookie.match(/csrftoken=([^;]+)/)?.[1];
+        if (csrf) headers["X-CSRFToken"] = csrf;
+      }
       const res = await fetchFn(requestUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": CHROME_UA,
-          Origin: "https://www.instagram.com",
-          "X-IG-App-ID": cfg.appId,
-          "X-FB-Friendly-Name": cfg.friendlyName,
-          "X-ASBD-ID": ASBD_ID,
-        },
+        headers,
         body: new URLSearchParams({
           doc_id: cfg.docId,
           variables: JSON.stringify({ shortcode: code }),

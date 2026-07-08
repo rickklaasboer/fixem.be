@@ -101,6 +101,9 @@ export function loadConfig(
       friendlyName: env.INSTAGRAM_FRIENDLY_NAME || INSTAGRAM_DEFAULTS.friendlyName,
       // Optional residential-proxy offload; unset means direct fetch.
       proxyUrl: env.INSTAGRAM_PROXY_URL || undefined,
+      // Optional logged-in session cookie (burner sessionid=...); authenticates
+      // the GraphQL call past the login wall. A full account credential — keep secret.
+      cookie: env.INSTAGRAM_COOKIE || undefined,
     },
   };
 }

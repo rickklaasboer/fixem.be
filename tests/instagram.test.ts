@@ -284,6 +284,37 @@ describe("instagram adapter", () => {
     expect(recorded[0]!.url).toBe(proxyUrl + encodeURIComponent(GRAPHQL_URL));
   });
 
+  test("session cookie is sent on the GraphQL call with mirrored X-CSRFToken", async () => {
+    const recorded: Recorded[] = [];
+    const ad = createInstagramAdapter(fakeFetch({ recorded, body: videoFixture }), {
+      ...INSTAGRAM_DEFAULTS,
+      cookie: "sessionid=SECRET_SESSION; csrftoken=TOKEN123; ds_user_id=42",
+    });
+    await ad.resolve(P_URL);
+    expect(recorded[0]!.headers.get("Cookie")).toBe("sessionid=SECRET_SESSION; csrftoken=TOKEN123; ds_user_id=42");
+    expect(recorded[0]!.headers.get("X-CSRFToken")).toBe("TOKEN123");
+  });
+
+  test("no Cookie header when no session cookie is configured", async () => {
+    const recorded: Recorded[] = [];
+    await createInstagramAdapter(fakeFetch({ recorded, body: videoFixture })).resolve(P_URL);
+    expect(recorded[0]!.headers.get("Cookie")).toBeNull();
+    expect(recorded[0]!.headers.get("X-CSRFToken")).toBeNull();
+  });
+
+  test("session cookie NEVER leaks into video.proxyHeaders (must not reach the /v/ token)", async () => {
+    const ad = createInstagramAdapter(fakeFetch({ body: videoFixture }), {
+      ...INSTAGRAM_DEFAULTS,
+      cookie: "sessionid=SUPER_SECRET",
+    });
+    const m = await ad.resolve(P_URL);
+    expect(m.video?.proxyHeaders).toBeDefined();
+    const serialized = JSON.stringify(m.video?.proxyHeaders);
+    expect(serialized).not.toContain("SUPER_SECRET");
+    expect(serialized).not.toContain("sessionid");
+    expect(m.video?.proxyHeaders?.Cookie).toBeUndefined();
+  });
+
   test("config is injectable (2nd param overrides defaults)", async () => {
     const recorded: Recorded[] = [];
     const ad = createInstagramAdapter(fakeFetch({ recorded }), {

@@ -8,44 +8,34 @@ import type Clock from '@/services/Clock';
 import Crawler from '@/support/Crawler';
 
 describe('ApiAuthMiddleware', () => {
-    test('404s when no key is configured', async () => {
-        const mw = new ApiAuthMiddleware({
-            statusApiKey: '',
-        } as unknown as Config);
+    const build = (apiKeys: string[]) => {
+        const mw = new ApiAuthMiddleware({apiKeys} as unknown as Config);
         const app = new Hono();
         app.use('/api/*', mw.handle);
         app.get('/api/thing', (c) => c.json({ok: true}));
+        return app;
+    };
 
-        const res = await app.request('/api/thing');
+    test('404s when no keys are configured', async () => {
+        const res = await build([]).request('/api/thing');
         expect(res.status).toBe(404);
         expect(await res.json()).toEqual({error: 'not found'});
     });
 
-    test('401s with a wrong X-Api-Key', async () => {
-        const mw = new ApiAuthMiddleware({
-            statusApiKey: 'secret',
-        } as unknown as Config);
-        const app = new Hono();
-        app.use('/api/*', mw.handle);
-        app.get('/api/thing', (c) => c.json({ok: true}));
-
-        const res = await app.request('/api/thing', {
-            headers: {'X-Api-Key': 'wrong'},
+    test('401s on a missing or wrong bearer token', async () => {
+        const app = build(['secret']);
+        expect((await app.request('/api/thing')).status).toBe(401);
+        const wrong = await app.request('/api/thing', {
+            headers: {Authorization: 'Bearer nope'},
         });
-        expect(res.status).toBe(401);
-        expect(await res.json()).toEqual({error: 'unauthorized'});
+        expect(wrong.status).toBe(401);
+        expect(await wrong.json()).toEqual({error: 'unauthorized'});
     });
 
-    test('passes through to the downstream handler with the right key', async () => {
-        const mw = new ApiAuthMiddleware({
-            statusApiKey: 'secret',
-        } as unknown as Config);
-        const app = new Hono();
-        app.use('/api/*', mw.handle);
-        app.get('/api/thing', (c) => c.json({ok: true}));
-
+    test('passes through with any configured key', async () => {
+        const app = build(['k1', 'k2']);
         const res = await app.request('/api/thing', {
-            headers: {'X-Api-Key': 'secret'},
+            headers: {Authorization: 'Bearer k2'},
         });
         expect(res.status).toBe(200);
         expect(await res.json()).toEqual({ok: true});

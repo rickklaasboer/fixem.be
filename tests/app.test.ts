@@ -165,12 +165,12 @@ describe('routes', () => {
     });
 
     const API_KEY = 'test-status-key';
-    const apiCfg: Partial<Config> = {statusApiKey: API_KEY};
+    const apiCfg: Partial<Config> = {apiKeys: [API_KEY]};
     const apiGet = (app: Hono, path: string, key: string | null = API_KEY) =>
         app.request(path, {
             headers: {
                 'User-Agent': BROWSER_UA,
-                ...(key === null ? {} : {'X-Api-Key': key}),
+                ...(key === null ? {} : {Authorization: `Bearer ${key}`}),
             },
         });
 
@@ -226,7 +226,7 @@ describe('routes', () => {
         expect(res.status).toBe(400);
     });
 
-    test('/api/* requires a valid X-Api-Key', async () => {
+    test('/api/* requires a valid bearer token', async () => {
         const app = makeApp({config: apiCfg});
         const path = `/api/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`;
         expect((await apiGet(app, path, null)).status).toBe(401); // missing
@@ -234,8 +234,8 @@ describe('routes', () => {
         expect((await apiGet(app, path, API_KEY)).status).toBe(200); // valid
     });
 
-    test('/api/* is closed (404) when STATUS_API_KEY is not configured', async () => {
-        // default makeApp() sets no STATUS_API_KEY → the API surface is disabled.
+    test('/api/* is closed (404) when no API_KEYS are configured', async () => {
+        // default makeApp() sets no apiKeys → the API surface is disabled.
         const path = `/api/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`;
         expect((await apiGet(makeApp(), path, API_KEY)).status).toBe(404);
         expect((await apiGet(makeApp(), path, null)).status).toBe(404);

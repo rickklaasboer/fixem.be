@@ -133,7 +133,7 @@ and edit as needed; every value has a sane default (see `src/lib/config.ts`).
 | `TWITCH_GQL_CLIENT_ID` | *(pinned)* | Twitch's public web client ID, used for the clip video (GraphQL) call. Override **only** if Twitch rotates its public web constants; the pinned default lives in `src/adapters/twitch.ts`. |
 | `TWITCH_GQL_CLIP_HASH` | *(pinned)* | Persisted-query hash for the clip playback-access-token GraphQL call. Override **only** if Twitch rotates its public web constants. |
 | `TWITTER_SYNDICATION_FEATURES` | *(pinned)* | Semicolon-joined feature flags sent to the X/Twitter syndication endpoint. Override **only** if X changes the flags it requires; the pinned default lives in `src/adapters/twitter.ts`. |
-| `REDDIT_CLIENT_ID` | *(empty)* | Reddit app client ID (optional). When set together with the secret, the Reddit adapter authenticates via OAuth (`oauth.reddit.com`) instead of anonymous JSON, which many networks IP-block. Register a "script" app at [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps). |
+| `REDDIT_CLIENT_ID` | *(empty)* | Reddit app client ID (optional). Reddit disabled its anonymous `.json` API (returns 403), so by default the adapter scrapes **old.reddit.com** HTML — this works for images/galleries/text/NSFW but yields only a **poster image** for videos. With credentials, it uses the OAuth API (`oauth.reddit.com`) for full data incl. muxed video. NOTE: Reddit's self-serve API keys were removed in 2025; credentials now require approval via their Responsible Builder Policy. |
 | `REDDIT_CLIENT_SECRET` | *(empty)* | Reddit app client secret (optional, pairs with `REDDIT_CLIENT_ID`). |
 | `PROXY_SECRET` | *(empty)* | HMAC key that signs `/v/` media-proxy URLs. **Set it to a random string to enable inline video** for TikTok/Threads/Instagram; blank disables the proxy and those platforms degrade to a thumbnail or link. See [Video proxy](#video-proxy). |
 | `PROXY_HOST_ALLOWLIST` | *(pinned)* | Comma-separated CDN hosts the proxy may fetch (suffix match). The proxy is **not** an open proxy — only allowlisted hosts are reachable even with a valid token. Blank uses the built-in default list in `src/lib/config.ts`. |
@@ -231,7 +231,7 @@ and can break the tags crawlers parse. Leave `User-Agent` pass-through on.
 | Platform | Status | Coverage |
 |---|---|---|
 | `example.com` (dummy adapter) | Available now (M1) | Smoke-test target |
-| Reddit | Available now (M2) | Posts, galleries, video, crossposts, NSFW marker. Without `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`, Reddit may degrade to plain redirects depending on the server's IP reputation. |
+| Reddit | Available now (M2) | Anonymous by default via old.reddit.com HTML (images, galleries, text, link previews, NSFW; **video posts show a poster image only**). With OAuth credentials: full JSON incl. muxed video and richer crosspost media. Reddit's anonymous `.json` API is dead and self-serve API keys are approval-gated (2025 Responsible Builder Policy). |
 | Bluesky | Available now (M2) | Images, video thumbnail, quotes, external links |
 | Twitch | Available now (M3) | Clips — title, broadcaster, view count, thumbnail, and inline MP4 (needs `TWITCH_CLIENT_ID`/`TWITCH_CLIENT_SECRET`). |
 | Twitter/X | Available now (M3) | Tweets — text, photos, inline MP4 video, quoted-tweet preview, NSFW marker. No credentials required. |

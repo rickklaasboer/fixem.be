@@ -50,5 +50,26 @@ services:
       timeout: 3s
       retries: 5
 
+  # Status monitoring. Checks liveness (/healthz) every minute and re-resolves
+  # one post per embed adapter every 4h via the /preview/ hatch, alerting to
+  # Discord on failure. Reaches the app over the internal network as `app:3000`.
+  # Config + monitored URLs live in ./gatus/config.yaml. Dashboard on loopback —
+  # front it with your reverse proxy for a public status page (status.fixem.be).
+  gatus:
+    image: twinproduction/gatus:v5.36.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./gatus/config.yaml:/config/config.yaml:ro
+      - gatus-data:/data
+    depends_on:
+      app:
+        condition: service_healthy
+
 volumes:
   redis-data:
+  gatus-data:

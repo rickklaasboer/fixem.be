@@ -7,7 +7,7 @@ import { clientIp } from "./lib/rate-limit";
 import { isCrawler } from "./ua";
 import { parseTargetUrl } from "./url";
 import type { Resolver } from "./resolver";
-import { minimalMeta, renderMetaHtml, renderPreviewNoAdapter } from "./render/meta-html";
+import { minimalMeta, renderMetaHtml, renderPreviewNoAdapter, renderPreviewReport } from "./render/meta-html";
 import { renderOembed } from "./render/oembed";
 import { mountProxy, isHostAllowed } from "./proxy";
 import { signProxyToken } from "./lib/proxy-sign";
@@ -136,13 +136,26 @@ export function buildApp(deps: AppDeps): Hono {
       },
       "embed served",
     );
+    // Preview is a human-facing debug view: render the full diagnostic report
+    // (outcome, visual card, parsed metadata, exact crawler HTML) and never cache
+    // it. Crawlers get the plain meta HTML.
+    if (preview) {
+      c.header("Cache-Control", "no-store");
+      return c.html(
+        renderPreviewReport({
+          platform: outcome.platform,
+          status: outcome.status,
+          cacheHit: outcome.status === "ok" ? outcome.cacheHit : undefined,
+          reason: outcome.status === "degraded" ? outcome.reason : undefined,
+          canonicalUrl: outcome.canonicalUrl,
+          meta,
+          oembedUrl: oembedUrlFor(outcome.canonicalUrl),
+        }),
+      );
+    }
     // Don't let CDNs pin a transient failure for the full crawler TTL.
     c.header("Cache-Control", outcome.status === "ok" ? "public, max-age=300" : "no-store");
-    // Preview exists to inspect the HTML in a browser (README), so it must
-    // not instantly meta-refresh away.
-    return c.html(
-      renderMetaHtml(meta, { oembedUrl: oembedUrlFor(outcome.canonicalUrl), refresh: !preview }),
-    );
+    return c.html(renderMetaHtml(meta, { oembedUrl: oembedUrlFor(outcome.canonicalUrl), refresh: true }));
   });
 
   app.onError((err, c) => {

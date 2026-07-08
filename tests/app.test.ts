@@ -65,13 +65,23 @@ describe("routes", () => {
     expect(res.headers.get("Location")).toBe("https://example.com/hello");
   });
 
-  test("browser with fixem=preview gets meta-HTML without meta refresh", async () => {
+  test("browser with fixem=preview gets a diagnostic report (no meta refresh)", async () => {
     const res = await get(makeApp(), "/https://example.com/hello?fixem=preview", BROWSER_UA);
     expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toBe("no-store"); // debug view, never cached
     const html = await res.text();
+    // Diagnostic report sections + resolution info.
+    expect(html).toContain("?fixem=preview");
+    expect(html).toContain("Embed card");
+    expect(html).toContain("Metadata");
+    expect(html).toContain("Crawler HTML");
+    expect(html).toContain("dummy"); // platform name
+    expect(html).toContain("cache miss"); // resolution status
+    expect(html).toContain("fixem.be works!"); // the resolved title
+    // The exact crawler HTML is embedded (escaped) for inspection.
     expect(html).toContain("og:title");
-    // Preview is for inspecting the HTML in a browser; it must not
-    // instantly navigate away.
+    // Preview is for inspecting in a browser; it must not instantly navigate away
+    // — the embedded crawler HTML is rendered with refresh disabled.
     expect(html).not.toContain('http-equiv="refresh"');
   });
 
@@ -171,6 +181,30 @@ describe("routes", () => {
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('content="https://broken.test/post/1"');
     expect(res.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  test("degraded resolve under ?fixem=preview reports the degrade reason", async () => {
+    const failing = {
+      name: "broken",
+      match: (u: URL) => u.hostname === "broken.test",
+      canonicalize: (u: URL) => `https://broken.test${u.pathname}`,
+      resolve: async () => {
+        throw new Error("scraper died");
+      },
+    };
+    const resolver = new Resolver({
+      registry: new AdapterRegistry([failing]),
+      cache: new MemoryCache(),
+      logger: createLogger({ write: () => {} }),
+      ttlSeconds: 60,
+      timeoutMs: 100,
+    });
+    const app = makeApp({ resolver });
+    const res = await get(app, "/https://broken.test/post/1?fixem=preview", BROWSER_UA);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("broken"); // platform
+    expect(html).toContain("degraded"); // status with reason
   });
 
   test("a well-formed URL never 500s even if the handler itself throws (onError guard)", async () => {

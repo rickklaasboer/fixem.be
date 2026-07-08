@@ -3,7 +3,7 @@ import ThreadsAdapter from '../src/adapters/ThreadsAdapter';
 import {THREADS_DEFAULTS} from '../src/config/defaults';
 import Config from '../src/config/Config';
 import HttpClient, {FIREFOX_UA} from '../src/services/HttpClient';
-import type {FetchFn} from '../src/adapters/types';
+import type {FetchFn} from '@/services/HttpClient';
 import routeFixture from './fixtures/threads/route.json';
 import postImage from './fixtures/threads/post-image.json';
 import postVideo from './fixtures/threads/post-video.json';

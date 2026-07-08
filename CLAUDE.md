@@ -13,33 +13,36 @@ Do **not** add Claude commit attribution. Do not append `Co-Authored-By: Claude 
 ## Commands
 
 ```bash
-bun install            # deps (hono is the ONLY runtime dependency)
+bun install            # deps (runtime: hono, tsyringe, reflect-metadata)
 bun run dev            # dev server on :3000 (--watch)
-bun test               # full suite — no live network (fixtures + injected fetchFn)
+bun test               # full suite — no live network (fixtures + injected fakes)
 bun test tests/x.test.ts        # single file
 bun test -t "name substring"    # single test by name
 bunx tsc --noEmit      # typecheck (strict); must be clean before committing
 docker compose up -d --build    # app + Valkey; app on 127.0.0.1:3000
 ```
 
-Config is all env vars (see `.env.example`, loaded by `src/lib/config.ts`); `.env` is gitignored and holds real secrets — never read, print, or commit it.
+Config is all env vars (see `.env.example`, loaded by `loadConfig()` in `src/config/Config.ts`); `.env` is gitignored and holds real secrets — never read, print, or commit it.
 
 ## Architecture
 
-Layered, single Hono app. Data flows one direction:
+Object-oriented / MVC-ish, wired by a `tsyringe` DI container (class-as-token, no string tokens). Data flows one direction:
 
-**routes** (`src/app.ts`, `src/ua.ts`, `src/url.ts`) → **resolver** (`src/resolver.ts`) → **adapters** (`src/adapters/*`) → **renderers** (`src/render/*`).
+**routes** (`src/http/routes.ts`) → **controllers** (`src/http/controllers/*`) → **resolver** (`src/domain/Resolver.ts`) → **adapters** (`src/adapters/*Adapter.ts`) → **renderers** (`src/render/*Renderer.ts`).
 
-- `src/app.ts` — the catch-all route parses the wrapped target URL, branches on `User-Agent`: known crawlers (or the `/preview/<url>` path prefix) get resolved + rendered embed HTML; everyone else gets a `302` (no resolve on that path). Rate-limits non-crawlers. `onError` + the resolver guarantee a well-formed URL **never** 500s. Also mounts the `/v/` proxy and, at render time, rewrites `video.proxyHeaders` media into signed `/v/` URLs (`withProxiedVideo`).
-- `src/resolver.ts` — cache (`meta:<canonical>`), in-flight dedup, per-resolve timeout, per-platform circuit breaker, and a top-level guard so `resolve()` never throws (degrades instead). Honors `EmbedMetadata.ttlSeconds`.
-- `src/adapters/*` — one `PlatformAdapter` per platform (`registry.ts` picks the first whose `match()` hits; wired in `src/index.ts`). Each is a pure **URL → `EmbedMetadata`** factory taking an injected `fetchFn` (so tests use recorded fixtures, no network). Adapters **throw** on failure; the resolver degrades. Reachable-but-refused (login walls, unavailable posts) return an informative `kind:"link"` embed rather than throwing.
-- `src/render/{meta-html,oembed}.ts` — build the crawler HTML + oEmbed JSON from one `EmbedMetadata`. `meta-html` escapes every interpolated value.
-- `src/proxy.ts` — `GET /v/:token`: HMAC-verified (`src/lib/proxy-sign.ts`), host-allowlisted, https-only, re-validates every redirect hop (SSRF guard), forwards `Range`, streams with concurrency + byte caps. Used for platforms whose media CDN needs headers Discord won't send.
+- `src/index.ts` → `src/bootstrap.ts` — `index.ts` imports `reflect-metadata` first, then `bootstrap()` registers the leaf instances (`Config`, `Logger`, `HttpClient`, `Cache`, `RateLimitStore`), builds the ordered adapter array (conditional Twitch) into `AdapterRegistry`, and binds routes via `src/http/routes.ts`. `src/container.ts` exports the container + the `app()` resolve helper. Everything else is `@injectable`/`@singleton` and resolves on demand.
+- `src/http/controllers/EmbedController.ts` — the catch-all `*` handler: parses the wrapped target, branches on `User-Agent` (known crawlers, or the `/preview/<url>` prefix, get resolved + rendered embed HTML; everyone else gets a `302`). `onError` + the resolver guarantee a well-formed URL **never** 500s. Rewrites `video.proxyHeaders` media into signed `/v/` URLs via `VideoProxy`.
+- `src/http/middleware/*` — `ApiAuthMiddleware` gates `/api/*` (closed 404 when no key); `RateLimitMiddleware` limits `/oembed` + `*` (known crawlers bypass; `/preview/` does **not**). `/v/` limits **all** clients unconditionally inside `ProxyStreamer`.
+- `src/domain/Resolver.ts` — cache (`meta:<canonical>`), in-flight dedup, per-resolve timeout, per-platform circuit breaker, and a top-level guard so `resolve()` never throws (degrades instead). Honors `EmbedMetadata.ttlSeconds`. `AdapterRegistry` picks the first adapter whose `match()` hits.
+- `src/adapters/*Adapter.ts` — one `@injectable` `PlatformAdapter` per platform, extending `BaseAdapter`; a pure **URL → `EmbedMetadata`** unit taking an injected `HttpClient` (+ `Config` where needed), so tests use recorded fixtures, no network. Adapters **throw** on failure; the resolver degrades. Reachable-but-refused (login walls, unavailable posts) return an informative `kind:"link"` card via `BaseAdapter.linkCard()` rather than throwing.
+- `src/render/{MetaHtmlRenderer,OembedRenderer}.ts` — build the crawler HTML + oEmbed JSON from one `EmbedMetadata`. `MetaHtmlRenderer` escapes every interpolated value.
+- `src/services/ProxyStreamer.ts` — `GET /v/:token`: HMAC-verified (`ProxySigner`), host-allowlisted, https-only, re-validates every redirect hop (SSRF guard), forwards `Range`, streams with concurrency + byte caps. `VideoProxy` signs the `/v/` tokens at render time. Used for platforms whose media CDN needs headers Discord won't send.
 
 ## Conventions (follow these)
 
 - **Runtime deps: `hono`, `tsyringe`, `reflect-metadata` only.** No other npm runtime packages. DI is a tsyringe container using class-as-token (no string tokens); `reflect-metadata` is imported once at the entrypoint. Redis is Bun's built-in `RedisClient`; crypto is Web Crypto.
-- **Tests never hit the network** — inject `fetchFn`, use `as unknown as FetchFn`, record trimmed fixtures under `tests/fixtures/<platform>/`.
+- **Layout & DI:** files are PascalCase named for the class/type they `export default` (`RedditAdapter.ts`), folders are lowercase, imports use the `@/` alias. Injected deps must be **value imports** (`import Foo`, never `import type Foo`) so `emitDecoratorMetadata` sees them — biome's `useImportType` is disabled for this reason. Multi-impl contracts (`Cache`, `RateLimitStore`) are abstract classes used as the token; single-impl services are concrete classes; pure contracts (`PlatformAdapter`, `EmbedMetadata`) are interfaces.
+- **Tests never hit the network** — inject a fake `HttpClient` (`new HttpClient(mockFetch as unknown as FetchFn)`) or structural fakes cast to the class, record trimmed fixtures under `tests/fixtures/<platform>/`. Integration tests build the app via `createTestApp()` (a child container).
 - **`match()` compares `url.hostname` by exact Set membership** — never substrings (SSRF/spoofing).
 - **Version-fragile platform constants** (doc_ids, app-ids, GQL hashes, mobile-API ids) are env-overridable with pinned defaults, using `||`-fallback (so a blank `.env` value still uses the default — `??` would leak `""`).
 - Redis/proxy clients fail **open** (`enableOfflineQueue: false`); a Redis outage runs cache-less, never blocks a request.

@@ -1,7 +1,7 @@
 import {describe, expect, test} from 'bun:test';
 import Snapsave from '@/services/Snapsave';
 import HttpClient from '../src/services/HttpClient';
-import type {FetchFn} from '../src/adapters/types';
+import type {FetchFn} from '@/services/HttpClient';
 
 // A real recorded snapsave.app response (a photo post). Guards the obfuscation
 // decoder against regressions — if snapsave rotates its scheme, this fails loudly.

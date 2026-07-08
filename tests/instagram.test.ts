@@ -4,7 +4,7 @@ import {INSTAGRAM_DEFAULTS, type InstagramConfig} from '../src/config/defaults';
 import Config from '../src/config/Config';
 import HttpClient, {CHROME_UA} from '../src/services/HttpClient';
 import Snapsave from '../src/services/Snapsave';
-import type {FetchFn} from '../src/adapters/types';
+import type {FetchFn} from '@/services/HttpClient';
 import imageFixture from './fixtures/instagram/graphql-image.json';
 import videoFixture from './fixtures/instagram/graphql-video.json';
 

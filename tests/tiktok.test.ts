@@ -3,7 +3,7 @@ import TiktokAdapter from '../src/adapters/TiktokAdapter';
 import {TIKTOK_DEFAULTS} from '../src/config/defaults';
 import Config from '../src/config/Config';
 import HttpClient, {CHROME_UA} from '../src/services/HttpClient';
-import type {FetchFn} from '../src/adapters/types';
+import type {FetchFn} from '@/services/HttpClient';
 import videoFixture from './fixtures/tiktok/universal-video.json';
 import photoFixture from './fixtures/tiktok/universal-photo.json';
 

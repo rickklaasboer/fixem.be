@@ -1,6 +1,6 @@
 import {describe, expect, test} from 'bun:test';
 import OembedRenderer from '@/render/OembedRenderer';
-import type {EmbedMetadata} from '@/adapters/types';
+import type EmbedMetadata from '@/domain/EmbedMetadata';
 
 const meta: EmbedMetadata = {
     kind: 'video',

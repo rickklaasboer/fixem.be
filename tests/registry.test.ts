@@ -1,9 +1,9 @@
 import {describe, expect, test} from 'bun:test';
 import AdapterRegistry from '@/domain/AdapterRegistry';
-import {createDummyAdapter} from '../src/adapters/dummy';
+import DummyAdapter from '@/adapters/DummyAdapter';
 
 describe('registry + dummy adapter', () => {
-    const registry = new AdapterRegistry([createDummyAdapter()]);
+    const registry = new AdapterRegistry([new DummyAdapter()]);
 
     test('finds adapter by host', () => {
         expect(registry.find(new URL('https://example.com/x'))?.name).toBe(

@@ -1,6 +1,6 @@
 import {describe, expect, test} from 'bun:test';
 import MetaHtmlRenderer from '@/render/MetaHtmlRenderer';
-import type {EmbedMetadata} from '@/adapters/types';
+import type EmbedMetadata from '@/domain/EmbedMetadata';
 
 const r = new MetaHtmlRenderer();
 

@@ -268,6 +268,26 @@ and can break the tags crawlers parse. Leave `User-Agent` pass-through on.
 
 ---
 
+## Public API
+
+The same resolver that powers the embeds is exposed as a versioned JSON API
+under `/api/v1/*`. The full contract lives in [`openapi.yaml`](openapi.yaml),
+served publicly at `GET /openapi.yaml`.
+
+- `GET  /api/v1/resolve?url=[&media=proxied]` — resolve one URL to metadata.
+- `POST /api/v1/resolve` — batch (`{ "urls": [...], "media"? }`, bounded by `BATCH_MAX_URLS`).
+- `GET  /api/v1/canonical?url=` — platform + canonical URL, no upstream fetch.
+- `GET  /api/v1/platforms` — supported platforms + capability flags.
+- `GET  /api/v1/health[?url=]` — adapter health, or `{ok, redis}` liveness.
+
+Every resolvable URL returns `200` with a `status` discriminator
+(`ok` / `degraded` / `no-adapter`) — a well-formed URL never 5xxs. Auth is
+`Authorization: Bearer <key>` against `API_KEYS`; requests are rate-limited
+per key (`API_RATE_LIMIT_PER_MIN`, with `X-RateLimit-*` headers). By default
+`video.url` is the raw upstream URL plus a `needsProxy` flag; pass
+`?media=proxied` to also get a signed, playable `/v/` URL. `oEmbed` stays public
+and unauthenticated at `GET /oembed`.
+
 ## Status monitoring
 
 `compose.prod.yaml` ships an optional [Gatus](https://github.com/TwiN/gatus)
@@ -276,7 +296,7 @@ sidecar (`gatus` service) that watches the deployment:
 - **Liveness** (every minute): `GET /healthz` (app + Redis) and the full public
   path `https://fixem.be/healthz` (also checks the TLS cert isn't near expiry).
 - **Adapters** (every 4 hours): one real resolve per platform via the JSON
-  endpoint `GET /api/status/adapter?url=<post>`, which returns
+  endpoint `GET /api/v1/health?url=<post>`, which returns
   `{platform, status, kind, hasMedia, …}`. Gatus asserts on it with JSONPath
   (`[BODY].hasMedia == true`); its glob `pattern()` can't match a multi-line HTML
   body, so this endpoint exists instead of scraping `/preview/`. The 4h interval
@@ -286,10 +306,12 @@ sidecar (`gatus` service) that watches the deployment:
   live code path only (`[BODY].platform == threads`), since it degrades by design
   from a datacenter IP.
 
-The `/api/*` surface is **authenticated**: set `STATUS_API_KEY` in `.env` to a
-random secret (`openssl rand -hex 32`) — the app requires it as an `X-Api-Key`
-header, and Gatus sends it. With `STATUS_API_KEY` blank the whole `/api/*`
-namespace returns 404, so the status endpoint is never open unauthenticated.
+The `/api/v1/*` surface is **authenticated**: set `API_KEYS` in `.env` to one or
+more random secrets (comma-separated; `openssl rand -hex 32` each) — the app
+requires one as an `Authorization: Bearer <key>` header. Point Gatus at a single
+one via `MONITOR_API_KEY` (which must be listed in `API_KEYS`). With `API_KEYS`
+blank the whole `/api/v1/*` namespace returns 404, so it is never open
+unauthenticated.
 
 Set `GATUS_DISCORD_WEBHOOK_URL` in `.env` to get Discord alerts on
 failure/recovery (blank = dashboard only). The dashboard binds to
@@ -302,7 +324,7 @@ first deploy and swap any that aren't:
 
 ```bash
 # On the VPS, from the compose directory — confirm each adapter has media
-# (or, for threads, a live code path) BEFORE relying on alerts. Uses $STATUS_API_KEY
+# (or, for threads, a live code path) BEFORE relying on alerts. Uses $MONITOR_API_KEY
 # from the environment (e.g. `set -a; . ./.env; set +a`).
 for u in \
   "https://www.reddit.com/r/pics/comments/haucpf/ive_found_a_few_funny_memories_during_lockdown/" \
@@ -311,8 +333,8 @@ for u in \
   "https://www.instagram.com/p/BsOGulcndj-/" \
   "https://www.tiktok.com/@zachking/video/7095025543627705643" ; do
   printf '%s -> ' "$u"
-  curl -s -H "X-Api-Key: $STATUS_API_KEY" \
-    "http://127.0.0.1:3000/api/status/adapter?url=$u"
+  curl -s -H "Authorization: Bearer $MONITOR_API_KEY" \
+    "http://127.0.0.1:3000/api/v1/health?url=$u"
   echo
 done
 ```

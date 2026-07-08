@@ -7,11 +7,11 @@
 #
 # Secrets, injected from the environment (set in .env):
 #   ${GATUS_DISCORD_WEBHOOK_URL} — Discord alert webhook (blank = no alerts)
-#   ${STATUS_API_KEY}           — bearer key for the app's /api/* surface; sent
-#                                 as X-Api-Key on each adapter check. Must equal
-#                                 the app's STATUS_API_KEY or checks 401/404.
+#   ${MONITOR_API_KEY}          — a bearer key for the app's /api/v1 surface; sent
+#                                 as `Authorization: Bearer` on each adapter check.
+#                                 Must be one of the app's API_KEYS or checks 401/404.
 #
-# Adapter checks hit the app's /api/status/adapter JSON endpoint (not /preview/):
+# Adapter checks hit the app's /api/v1/health JSON endpoint (not /preview/):
 # Gatus condition matching uses JSONPath, and its glob `pattern()` can't match a
 # multi-line HTML body. The endpoint returns {platform,status,kind,hasMedia,...}.
 
@@ -62,8 +62,8 @@ endpoints:
           - type: discord
 
     # ---------------------------------------------------------------------
-    # Adapters — genuine end-to-end resolve via /api/status/adapter?url=<post>.
-    # Authenticated: each sends X-Api-Key: ${STATUS_API_KEY}.
+    # Adapters — genuine end-to-end resolve via /api/v1/health?url=<post>.
+    # Authenticated: each sends Authorization: Bearer ${MONITOR_API_KEY}.
     #
     # Interval is 4h to match CACHE_TTL_SECONDS (14400s): a shorter interval
     # would just re-validate the cached embed instead of re-fetching upstream.
@@ -77,9 +77,9 @@ endpoints:
     # ---------------------------------------------------------------------
     - name: reddit
       group: adapters
-      url: 'http://app:3000/api/status/adapter?url=https://www.reddit.com/r/pics/comments/haucpf/ive_found_a_few_funny_memories_during_lockdown/'
+      url: 'http://app:3000/api/v1/health?url=https://www.reddit.com/r/pics/comments/haucpf/ive_found_a_few_funny_memories_during_lockdown/'
       headers:
-          X-Api-Key: '${STATUS_API_KEY}'
+          Authorization: 'Bearer ${MONITOR_API_KEY}'
       interval: 4h
       conditions:
           - '[STATUS] == 200'
@@ -91,9 +91,9 @@ endpoints:
 
     - name: bluesky
       group: adapters
-      url: 'http://app:3000/api/status/adapter?url=https://bsky.app/profile/bsky.app/post/3m5yqc2is5s2q'
+      url: 'http://app:3000/api/v1/health?url=https://bsky.app/profile/bsky.app/post/3m5yqc2is5s2q'
       headers:
-          X-Api-Key: '${STATUS_API_KEY}'
+          Authorization: 'Bearer ${MONITOR_API_KEY}'
       interval: 4h
       conditions:
           - '[STATUS] == 200'
@@ -106,9 +106,9 @@ endpoints:
     - name: twitter
       group: adapters
       # Ellen's Oscar selfie — iconic image tweet, effectively never deleted.
-      url: 'http://app:3000/api/status/adapter?url=https://x.com/TheEllenShow/status/440322224407314432'
+      url: 'http://app:3000/api/v1/health?url=https://x.com/TheEllenShow/status/440322224407314432'
       headers:
-          X-Api-Key: '${STATUS_API_KEY}'
+          Authorization: 'Bearer ${MONITOR_API_KEY}'
       interval: 4h
       conditions:
           - '[STATUS] == 200'
@@ -122,9 +122,9 @@ endpoints:
       group: adapters
       # World-record egg — most-liked IG post, extremely stable. Requires
       # INSTAGRAM_COOKIE in prod (confirmed set) for the media path.
-      url: 'http://app:3000/api/status/adapter?url=https://www.instagram.com/p/BsOGulcndj-/'
+      url: 'http://app:3000/api/v1/health?url=https://www.instagram.com/p/BsOGulcndj-/'
       headers:
-          X-Api-Key: '${STATUS_API_KEY}'
+          Authorization: 'Bearer ${MONITOR_API_KEY}'
       interval: 4h
       conditions:
           - '[STATUS] == 200'
@@ -138,9 +138,9 @@ endpoints:
       group: adapters
       # Zach King "Magic Ride" — most-viewed TikTok. Inline video is streamed via
       # /v/, so this also implicitly checks that PROXY_SECRET is set.
-      url: 'http://app:3000/api/status/adapter?url=https://www.tiktok.com/@zachking/video/7095025543627705643'
+      url: 'http://app:3000/api/v1/health?url=https://www.tiktok.com/@zachking/video/7095025543627705643'
       headers:
-          X-Api-Key: '${STATUS_API_KEY}'
+          Authorization: 'Bearer ${MONITOR_API_KEY}'
       interval: 4h
       conditions:
           - '[STATUS] == 200'
@@ -156,9 +156,9 @@ endpoints:
       # "healthy" means the code path is alive and the adapter still matches —
       # NOT that it returned media. The post content is irrelevant; only the URL
       # shape (/@user/post/<code>) must stay valid.
-      url: 'http://app:3000/api/status/adapter?url=https://www.threads.net/@zuck/post/C8kQXNiRTFa'
+      url: 'http://app:3000/api/v1/health?url=https://www.threads.net/@zuck/post/C8kQXNiRTFa'
       headers:
-          X-Api-Key: '${STATUS_API_KEY}'
+          Authorization: 'Bearer ${MONITOR_API_KEY}'
       interval: 4h
       conditions:
           - '[STATUS] == 200'
@@ -172,9 +172,9 @@ endpoints:
     # URL below, and uncomment. Clip MP4s play direct (no /v/), so hasMedia works.
     # - name: twitch
     #   group: adapters
-    #   url: 'http://app:3000/api/status/adapter?url=https://clips.twitch.tv/<REAL_CLIP_SLUG>'
+    #   url: 'http://app:3000/api/v1/health?url=https://clips.twitch.tv/<REAL_CLIP_SLUG>'
     #   headers:
-    #       X-Api-Key: '${STATUS_API_KEY}'
+    #       Authorization: 'Bearer ${MONITOR_API_KEY}'
     #   interval: 4h
     #   conditions:
     #       - '[STATUS] == 200'

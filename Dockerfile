@@ -8,6 +8,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
+# tsconfig.json carries the `@/*` -> `./src/*` path mapping that Bun resolves at
+# RUNTIME; without it in the image, `bun src/index.ts` can't resolve `@/…` imports.
+COPY tsconfig.json ./
 COPY src ./src
 COPY public ./public
 EXPOSE 3000

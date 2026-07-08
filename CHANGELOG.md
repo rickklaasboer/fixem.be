@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.0](https://github.com///compare/v1.1.0...v1.2.0) (2026-07-08)
+
+### Features
+
+* put status endpoint behind authenticated /api/* ([c73bede](https://github.com///commit/c73bedeb60a37274640382cad946cd04c704a4f3))
+
+### Bug Fixes
+
+* check adapters via JSON /status/adapter, not /preview/ HTML ([64c5d0e](https://github.com///commit/64c5d0e39a049b02e93089a6200b053780852e34))
+
 ## [1.1.0](https://github.com///compare/v1.0.5...v1.1.0) (2026-07-08)
 
 ### Features

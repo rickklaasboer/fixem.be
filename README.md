@@ -34,7 +34,7 @@ GET /https://example.com/hello
         │
         ├── NO  ── rate-limit this client IP (crawlers are exempt)
         │            │
-        │            ├─ ?fixem=preview present?
+        │            ├─ /preview/ path prefix present?
         │            │     YES → fall through and render the embed HTML
         │            │            (so you can inspect exactly what a crawler sees)
         │            │     NO  → 302 redirect to the canonical original URL
@@ -79,14 +79,14 @@ Then try it in a browser or with curl:
 
 ```bash
 # See exactly what a crawler would receive:
-curl 'http://localhost:3000/https://example.com/hello?fixem=preview'
+curl 'http://localhost:3000/preview/https://example.com/hello'
 
 # Health check:
 curl http://localhost:3000/healthz
 ```
 
 The bundled **dummy adapter** matches `example.com`, so
-`http://localhost:3000/https://example.com/hello?fixem=preview` returns a working
+`http://localhost:3000/preview/https://example.com/hello` returns a working
 "fixem.be works! 🎉" embed with no external dependencies — handy for smoke-testing
 the whole crawler → resolve → cache → render pipeline.
 
@@ -298,7 +298,7 @@ paths on the orange cloud if you like, but the media stream must not be.
 1. Deploy (or tunnel a local instance: `cloudflared tunnel --url http://localhost:3000`).
 2. In any Discord channel, post: https://<your-host>/https://example.com/hello
 3. You should see a "fixem.be works! 🎉" embed with image and author line.
-4. Append `?fixem=preview` in a browser to inspect the exact HTML Discord saw.
+4. Prepend `/preview/` to the wrapped URL in a browser to inspect the exact HTML Discord saw.
 5. If no embed appears: check that the reverse proxy forwards User-Agent,
    and retry with a fresh path (Discord caches embeds per-URL aggressively —
    change /hello to /hello2 to bust it).

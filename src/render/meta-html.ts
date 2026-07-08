@@ -14,11 +14,11 @@ function tag(kind: "property" | "name", key: string, value: string | number): st
 }
 
 // Preview-only diagnostic for a URL that no adapter matched. A crawler gets a
-// bare 302 for these (no embed to build), which is invisible when you append
-// ?fixem=preview to debug — so instead of silently redirecting, explain why.
+// bare 302 for these (no embed to build), which is invisible when you prepend
+// /preview/ to debug — so instead of silently redirecting, explain why.
 const SUPPORTED = "Reddit · Bluesky · X (Twitter) · Threads · Instagram · TikTok · Twitch clips";
 
-// Shared webfont setup for the human-facing ?fixem=preview pages (matches the
+// Shared webfont setup for the human-facing /preview/ pages (matches the
 // landing page). The crawler-facing redirect page stays external-font-free.
 const FONT_LINKS = `<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -49,7 +49,7 @@ a{color:#5058e0;text-decoration:none}a:hover{text-decoration:underline}
 </head>
 <body>
 <main>
-<span class="tag">?fixem=preview</span>
+<span class="tag">/preview/</span>
 <h1>No adapter matched this URL</h1>
 <p>fixem.be has no platform adapter for this link, so a crawler (Discord, etc.) receives a plain <code>302</code> redirect — <b>no rich embed is generated</b>. This page only appears in preview.</p>
 <p class="url">Target: <a href="${esc(targetUrl)}">${esc(targetUrl)}</a></p>
@@ -64,9 +64,9 @@ function dims(m: { width?: number; height?: number }): string {
   return m.width && m.height ? ` (${m.width}×${m.height})` : "";
 }
 
-// Rich debug view for ?fixem=preview on a MATCHED url: the resolution outcome,
+// Rich debug view for /preview/ on a MATCHED url: the resolution outcome,
 // a visual embed card, the parsed metadata, and the exact crawler HTML Discord
-// would receive. Not crawler-facing — humans only reach it via ?fixem=preview.
+// would receive. Not crawler-facing — humans only reach it via /preview/.
 export function renderPreviewReport(opts: {
   platform: string;
   status: "ok" | "degraded";
@@ -138,7 +138,7 @@ pre{background:#fff;border:1px solid #e2e2dd;border-radius:8px;padding:12px 14px
 </head>
 <body>
 <main>
-<span class="tag">?fixem=preview</span>
+<span class="tag">/preview/</span>
 <h1>${esc(meta.title)}</h1>
 <p class="status"><b>${esc(opts.platform)}</b> · <span class="${statusClass}">${esc(statusLabel)}</span></p>
 
@@ -228,7 +228,7 @@ export function renderMetaHtml(
   }
 
   // Body styling is self-contained (system monospace, no external font) — this
-  // page is crawler-facing; a human only sees it via ?fixem=preview or if the
+  // page is crawler-facing; a human only sees it via /preview/ or if the
   // meta-refresh fails. It echoes the fixem.be landing palette.
   return `<!DOCTYPE html>
 <html lang="en">

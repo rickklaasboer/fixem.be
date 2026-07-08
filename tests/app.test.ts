@@ -65,13 +65,13 @@ describe("routes", () => {
     expect(res.headers.get("Location")).toBe("https://example.com/hello");
   });
 
-  test("browser with fixem=preview gets a diagnostic report (no meta refresh)", async () => {
-    const res = await get(makeApp(), "/https://example.com/hello?fixem=preview", BROWSER_UA);
+  test("browser on /preview/<url> gets a diagnostic report (no meta refresh)", async () => {
+    const res = await get(makeApp(), "/preview/https://example.com/hello", BROWSER_UA);
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toBe("no-store"); // debug view, never cached
     const html = await res.text();
     // Diagnostic report sections + resolution info.
-    expect(html).toContain("?fixem=preview");
+    expect(html).toContain("/preview/");
     expect(html).toContain("Embed card");
     expect(html).toContain("Metadata");
     expect(html).toContain("Crawler HTML");
@@ -98,12 +98,12 @@ describe("routes", () => {
     expect(b.status).toBe(302);
   });
 
-  test("no-adapter URL redirects a browser but shows a diagnostic under ?fixem=preview", async () => {
+  test("no-adapter URL redirects a browser but shows a diagnostic under /preview/", async () => {
     // unknown-platform.dev has no adapter registered (dummy only matches example.com).
     const redirect = await get(makeApp(), "/https://unknown-platform.dev/x", BROWSER_UA);
     expect(redirect.status).toBe(302);
 
-    const preview = await get(makeApp(), "/https://unknown-platform.dev/x?fixem=preview", BROWSER_UA);
+    const preview = await get(makeApp(), "/preview/https://unknown-platform.dev/x", BROWSER_UA);
     expect(preview.status).toBe(200);
     const html = await preview.text();
     expect(html).toContain("No adapter matched");
@@ -149,12 +149,19 @@ describe("routes", () => {
     expect((await get(app, path, DISCORD_UA)).status).toBe(200); // crawler unaffected
   });
 
-  test("fixem=preview is rate limited like a browser", async () => {
+  test("/preview/ is rate limited like a browser", async () => {
     const config = loadConfig({ RATE_LIMIT_PER_MIN: "1" });
     const app = makeApp({ config });
-    const path = "/https://example.com/hello?fixem=preview";
+    const path = "/preview/https://example.com/hello";
     expect((await get(app, path, BROWSER_UA)).status).toBe(200);
     expect((await get(app, path, BROWSER_UA)).status).toBe(429);
+  });
+
+  test("legacy ?fixem=preview no longer triggers the diagnostic (plain 302)", async () => {
+    const res = await get(makeApp(), "/https://example.com/hello?fixem=preview", BROWSER_UA);
+    expect(res.status).toBe(302);
+    // fixem is our reserved param and is stripped, never leaked to the target.
+    expect(res.headers.get("Location")).toBe("https://example.com/hello");
   });
 
   test("degraded resolve serves minimal embed to crawler", async () => {
@@ -183,7 +190,7 @@ describe("routes", () => {
     expect(res.headers.get("Cache-Control")).toBe("no-store");
   });
 
-  test("degraded resolve under ?fixem=preview reports the degrade reason", async () => {
+  test("degraded resolve under /preview/ reports the degrade reason", async () => {
     const failing = {
       name: "broken",
       match: (u: URL) => u.hostname === "broken.test",
@@ -200,7 +207,7 @@ describe("routes", () => {
       timeoutMs: 100,
     });
     const app = makeApp({ resolver });
-    const res = await get(app, "/https://broken.test/post/1?fixem=preview", BROWSER_UA);
+    const res = await get(app, "/preview/https://broken.test/post/1", BROWSER_UA);
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("broken"); // platform

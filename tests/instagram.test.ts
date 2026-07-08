@@ -1,12 +1,27 @@
 import {describe, expect, test} from 'bun:test';
-import {
-    createInstagramAdapter,
-    INSTAGRAM_DEFAULTS,
-} from '../src/adapters/instagram';
+import InstagramAdapter from '../src/adapters/InstagramAdapter';
+import {INSTAGRAM_DEFAULTS, type InstagramConfig} from '../src/config/defaults';
+import Config from '../src/config/Config';
+import HttpClient, {CHROME_UA} from '../src/services/HttpClient';
+import Snapsave from '../src/services/Snapsave';
 import type {FetchFn} from '../src/adapters/types';
-import {CHROME_UA} from '../src/lib/http';
 import imageFixture from './fixtures/instagram/graphql-image.json';
 import videoFixture from './fixtures/instagram/graphql-video.json';
+
+// Build the class-based adapter with the new DI shape while preserving the old
+// factory call sites: (fetchFn, igConfig). Both the adapter and its injected
+// Snapsave share the same fetchFn so a single URL-routing fake drives both the
+// GraphQL/mobile calls and the snapsave.app fallback.
+function createInstagramAdapter(
+    fetchFn: FetchFn = fetch,
+    igConfig: InstagramConfig = INSTAGRAM_DEFAULTS,
+): InstagramAdapter {
+    return new InstagramAdapter(
+        {instagram: igConfig} as unknown as Config,
+        new HttpClient(fetchFn),
+        new Snapsave(new HttpClient(fetchFn)),
+    );
+}
 
 interface Recorded {
     url: string;
@@ -231,7 +246,9 @@ describe('instagram adapter', () => {
             'Instagram blocked this preview (login wall). Click through to view.',
         );
         expect(m.siteName).toBe('Instagram');
-        expect(m.nsfw).toBe(false);
+        // linkCard() (the shared reachable-but-refused builder) doesn't carry an
+        // nsfw field — a link-only degrade card has no media to flag.
+        expect(m.nsfw).toBeUndefined();
         expect(m.originalUrl).toBe('https://www.instagram.com/p/CabcDEF123');
     });
 

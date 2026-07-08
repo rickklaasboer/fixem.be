@@ -7,7 +7,7 @@ import { clientIp } from "./lib/rate-limit";
 import { isCrawler } from "./ua";
 import { parseTargetUrl } from "./url";
 import type { Resolver } from "./resolver";
-import { minimalMeta, renderMetaHtml } from "./render/meta-html";
+import { minimalMeta, renderMetaHtml, renderPreviewNoAdapter } from "./render/meta-html";
 import { renderOembed } from "./render/oembed";
 import { mountProxy, isHostAllowed } from "./proxy";
 import { signProxyToken } from "./lib/proxy-sign";
@@ -116,7 +116,12 @@ export function buildApp(deps: AppDeps): Hono {
     }
 
     const outcome = await resolver.resolve(parsed.url);
-    if (outcome.status === "no-adapter") return c.redirect(parsed.url.href, 302);
+    if (outcome.status === "no-adapter") {
+      // Crawlers get a bare redirect (no embed to build). Under ?fixem=preview,
+      // that redirect is invisible/confusing when debugging, so show why instead.
+      if (preview) return c.html(renderPreviewNoAdapter(parsed.url.href));
+      return c.redirect(parsed.url.href, 302);
+    }
 
     const meta =
       outcome.status === "ok"

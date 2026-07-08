@@ -88,6 +88,19 @@ describe("routes", () => {
     expect(b.status).toBe(302);
   });
 
+  test("no-adapter URL redirects a browser but shows a diagnostic under ?fixem=preview", async () => {
+    // unknown-platform.dev has no adapter registered (dummy only matches example.com).
+    const redirect = await get(makeApp(), "/https://unknown-platform.dev/x", BROWSER_UA);
+    expect(redirect.status).toBe(302);
+
+    const preview = await get(makeApp(), "/https://unknown-platform.dev/x?fixem=preview", BROWSER_UA);
+    expect(preview.status).toBe(200);
+    const html = await preview.text();
+    expect(html).toContain("No adapter matched");
+    expect(html).toContain("https://unknown-platform.dev/x");
+    expect(html).not.toContain('http-equiv="refresh"'); // preview never auto-redirects
+  });
+
   test("garbage path is 400 with hint, never 500", async () => {
     const res = await get(makeApp(), "/favicon.ico", BROWSER_UA);
     expect(res.status).toBe(400);

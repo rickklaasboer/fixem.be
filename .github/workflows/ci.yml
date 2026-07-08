@@ -18,7 +18,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - name: Lint & format (biome)
@@ -41,7 +41,7 @@ jobs:
     outputs:
       version: ${{ steps.out.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main # be on the branch (not detached) so release-it can push
           fetch-depth: 0 # full history + tags for conventional-changelog

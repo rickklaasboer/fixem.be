@@ -1,6 +1,6 @@
 import type { EmbedMetadata, FetchFn, PlatformAdapter } from "./types";
 import { truncate } from "../lib/text";
-import { PLATFORM_UA } from "../lib/http";
+import { PLATFORM_UA, CHROME_UA } from "../lib/http";
 
 const HOSTS = new Set([
   "reddit.com",
@@ -96,6 +96,93 @@ function pickMedia(post: RedditPost): Pick<EmbedMetadata, "kind" | "image" | "vi
   return { kind: "link", image: previewImage(post) };
 }
 
+// Build embed metadata from a parsed Reddit API post (the OAuth JSON path).
+function metaFromPost(post: RedditPost, canonical: string): EmbedMetadata {
+  // Crossposts: real video crossposts often carry a regenerated preview image
+  // on the child while the actual media lives in the parent — inherit whenever
+  // the parent has richer media, keeping the child's preview as poster fallback.
+  const parent = post.crosspost_parent_list?.[0];
+  let media = pickMedia(post);
+  if (media.kind === "link" && parent) {
+    const parentMedia = pickMedia(parent);
+    if (parentMedia.kind !== "link") {
+      media = { ...parentMedia, image: parentMedia.image ?? media.image };
+    }
+  }
+
+  const selftext = (post.selftext ?? "").trim();
+  const descParts: string[] = [];
+  if (media.galleryCount) {
+    const n = media.galleryCount;
+    descParts.push(`Gallery • ${n} image${n === 1 ? "" : "s"}`);
+  }
+  if (selftext) descParts.push(truncate(selftext, 300));
+  const description = descParts.length ? descParts.join(" — ") : undefined;
+
+  return {
+    kind: media.kind,
+    title: post.title,
+    description,
+    author: { name: `u/${post.author}`, url: `https://www.reddit.com/user/${post.author}` },
+    siteName: `Reddit • r/${post.subreddit}`,
+    themeColor: "#FF4500",
+    image: media.image,
+    video: media.video,
+    nsfw: post.over_18 ?? false,
+    originalUrl: canonical,
+  };
+}
+
+function decodeEntities(s: string): string {
+  return s
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replace(/&#0*39;|&#x27;/gi, "'");
+}
+
+function metaContent(html: string, property: string): string | undefined {
+  const m = html.match(new RegExp(`<meta property="${property}" content="([^"]*)"`));
+  return m ? decodeEntities(m[1]!) : undefined;
+}
+
+// Anonymous fallback: Reddit disabled the public `.json` API (returns 403 + the
+// web-app shell) regardless of IP/UA, and OAuth credentials are now approval-
+// gated. old.reddit.com still server-renders logged-out post HTML, so we scrape
+// its stable og: tags + data- attributes. Video posts yield a poster image only
+// — the muxed MP4 needs the OAuth JSON path; here they degrade to image.
+function parseOldRedditHtml(html: string, canonical: string): EmbedMetadata {
+  const thing = html.match(/<div [^>]*data-fullname="t3_[^>]*>/)?.[0] ?? "";
+  const dataAttr = (name: string): string | undefined =>
+    thing.match(new RegExp(`${name}="([^"]*)"`))?.[1];
+
+  const author = dataAttr("data-author") || "[unknown]";
+  const subreddit = dataAttr("data-subreddit") || "reddit";
+  const nsfw = dataAttr("data-nsfw") === "true";
+  const domain = dataAttr("data-domain") ?? "";
+  const isGallery = dataAttr("data-is-gallery") === "true";
+  const image = metaContent(html, "og:image");
+  const title = metaContent(html, "og:title") ?? `Post from r/${subreddit}`;
+
+  let kind: EmbedMetadata["kind"] = "link";
+  if (isGallery) kind = "gallery";
+  else if (domain === "i.redd.it" || /\.(jpe?g|png|gif|webp)(\?|$)/i.test(dataAttr("data-url") ?? "")) {
+    kind = "image";
+  } else if (image) kind = "image"; // link/video posts still carry a preview thumbnail
+
+  return {
+    kind,
+    title,
+    author: { name: `u/${author}`, url: `https://www.reddit.com/user/${author}` },
+    siteName: `Reddit • r/${subreddit}`,
+    themeColor: "#FF4500",
+    image: image ? { url: image } : undefined,
+    nsfw,
+    originalUrl: canonical,
+  };
+}
+
 export function createRedditAdapter(fetchFn: FetchFn = fetch, creds?: RedditCreds): PlatformAdapter {
   const getToken = creds ? createTokenManager(fetchFn, creds) : undefined;
   return {
@@ -132,54 +219,28 @@ export function createRedditAdapter(fetchFn: FetchFn = fetch, creds?: RedditCred
         }
         canonical = `https://www.reddit.com${target.pathname.replace(/\/$/, "")}`;
       }
-      // With credentials, hit oauth.reddit.com — anonymous www.reddit.com JSON
-      // is IP-blocked on many networks. Canonical URLs stay www.reddit.com.
-      const res = getToken
-        ? await fetchFn(`https://oauth.reddit.com${new URL(canonical).pathname}.json?raw_json=1`, {
-            headers: { Authorization: `bearer ${await getToken()}`, "User-Agent": PLATFORM_UA },
-          })
-        : await fetchFn(`${canonical}.json?raw_json=1`, {
-            headers: { "User-Agent": PLATFORM_UA },
-          });
+
+      // No credentials → scrape old.reddit's server-rendered HTML. Reddit's
+      // anonymous `.json` API is globally disabled (403 + web-app shell), and
+      // OAuth creds are approval-gated, so this is the working no-auth path.
+      if (!getToken) {
+        const htmlRes = await fetchFn(`https://old.reddit.com${new URL(canonical).pathname}`, {
+          headers: { "User-Agent": CHROME_UA, Accept: "text/html" },
+        });
+        if (!htmlRes.ok) throw new Error(`reddit ${htmlRes.status}`);
+        return parseOldRedditHtml(await htmlRes.text(), canonical);
+      }
+
+      // With credentials, hit oauth.reddit.com for the full JSON (richest —
+      // includes muxed video, galleries, crosspost media). Canonical stays www.
+      const res = await fetchFn(`https://oauth.reddit.com${new URL(canonical).pathname}.json?raw_json=1`, {
+        headers: { Authorization: `bearer ${await getToken()}`, "User-Agent": PLATFORM_UA },
+      });
       if (!res.ok) throw new Error(`reddit ${res.status}`);
       const json = (await res.json()) as [{ data: { children: { data: RedditPost }[] } }, unknown];
       const post = json[0]?.data?.children?.[0]?.data;
       if (!post) throw new Error("reddit: no post in response");
-
-      // Crossposts: real video crossposts often carry a regenerated preview
-      // image on the child while the actual media lives in the parent —
-      // inherit whenever the parent has richer media, keeping the child's
-      // preview as poster fallback.
-      const parent = post.crosspost_parent_list?.[0];
-      let media = pickMedia(post);
-      if (media.kind === "link" && parent) {
-        const parentMedia = pickMedia(parent);
-        if (parentMedia.kind !== "link") {
-          media = { ...parentMedia, image: parentMedia.image ?? media.image };
-        }
-      }
-
-      const selftext = (post.selftext ?? "").trim();
-      const descParts: string[] = [];
-      if (media.galleryCount) {
-        const n = media.galleryCount;
-        descParts.push(`Gallery • ${n} image${n === 1 ? "" : "s"}`);
-      }
-      if (selftext) descParts.push(truncate(selftext, 300));
-      const description = descParts.length ? descParts.join(" — ") : undefined;
-
-      return {
-        kind: media.kind,
-        title: post.title,
-        description,
-        author: { name: `u/${post.author}`, url: `https://www.reddit.com/user/${post.author}` },
-        siteName: `Reddit • r/${post.subreddit}`,
-        themeColor: "#FF4500",
-        image: media.image,
-        video: media.video,
-        nsfw: post.over_18 ?? false,
-        originalUrl: canonical,
-      };
+      return metaFromPost(post, canonical);
     },
   };
 }

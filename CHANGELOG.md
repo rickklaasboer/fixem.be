@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.1](https://github.com///compare/v1.3.0...v1.3.1) (2026-07-08)
+
+### Bug Fixes
+
+* copy tsconfig.json into Docker image so Bun resolves @/ alias at runtime ([42c2417](https://github.com///commit/42c24172a0f346b70934e44450e9905ab9ada5e5))
+
 ## [1.3.0](https://github.com///compare/v1.2.0...v1.3.0) (2026-07-08)
 
 ### Features

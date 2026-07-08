@@ -8,8 +8,28 @@ const POST_RE = /^\/@([^/]+)\/(video|photo)\/(\d+)\/?$/;
 const SHORT_PATH_RE = /^\/t\/[^/]+/; // /t/<short> on a main host is a share link
 const VIDEO_HTML_RE = /\/v\/(\d+)\.html/; // mobile redirect variant
 
-const MEDIA_PROXY_HEADERS = { "User-Agent": CHROME_UA, Referer: "https://www.tiktok.com/" };
 const MEDIA_TTL_SECONDS = 3600;
+
+// TikTok's signed play URLs are bound to the session that scraped the page: they
+// 403 unless replayed with the ttwid/tt_csrf cookies the page set, plus a
+// browser UA and Referer. We capture those cookies at resolve time and hand them
+// to the /v/ proxy (which fetches from the same egress IP the cookies were
+// issued to). ttwid is a low-sensitivity tracking cookie, not a credential.
+function cookieHeaderFrom(res: Response): string {
+  const setCookies = res.headers.getSetCookie?.() ?? [];
+  return setCookies
+    .map((c) => c.split(";")[0]?.trim())
+    .filter((c): c is string => !!c)
+    .join("; ");
+}
+
+function mediaProxyHeaders(cookie: string): Record<string, string> {
+  return {
+    "User-Agent": CHROME_UA,
+    Referer: "https://www.tiktok.com/",
+    ...(cookie ? { Cookie: cookie } : {}),
+  };
+}
 
 export interface TiktokConfig {
   rehydrationScriptId: string;
@@ -111,6 +131,7 @@ export function createTiktokAdapter(
 
       const res = await fetchFn(pageUrl, { headers: { "User-Agent": CHROME_UA } });
       if (!res.ok) throw new Error(`tiktok ${res.status}`);
+      const cookie = cookieHeaderFrom(res);
       const { statusCode, itemStruct } = extractItemDetail(await res.text());
 
       if (statusCode === 10204) throw new Error("tiktok: not found");
@@ -157,7 +178,7 @@ export function createTiktokAdapter(
             width: v.width,
             height: v.height,
             mimeType: "video/mp4",
-            proxyHeaders: MEDIA_PROXY_HEADERS,
+            proxyHeaders: mediaProxyHeaders(cookie),
           };
           if (v.cover) image = { url: v.cover };
         }

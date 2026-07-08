@@ -159,6 +159,29 @@ describe("tiktok adapter", () => {
     expect(recorded[0]!.headers.get("User-Agent")).toBe(CHROME_UA);
   });
 
+  test("video: session cookies from the page scrape are forwarded as proxy Cookie", async () => {
+    const fetchFn = (async () => {
+      // TikTok sets ttwid/tt_csrf on the page response; the signed play URL
+      // 403s without them — they must ride along in the proxy headers.
+      const headers = new Headers({ "content-type": "text/html" });
+      headers.append("set-cookie", "ttwid=abc123; Path=/; Secure; HttpOnly");
+      headers.append("set-cookie", "tt_csrf_token=xyz; Path=/");
+      return new Response(pageHtml(videoFixture), { status: 200, headers });
+    }) as unknown as FetchFn;
+    const ad = createTiktokAdapter(fetchFn);
+    const m = await ad.resolve(VIDEO_URL);
+    expect(m.video?.proxyHeaders?.Cookie).toBe("ttwid=abc123; tt_csrf_token=xyz");
+    // UA + Referer still present
+    expect(m.video?.proxyHeaders?.["User-Agent"]).toBe(CHROME_UA);
+  });
+
+  test("video: no Cookie header when the page sets no cookies", async () => {
+    const ad = createTiktokAdapter(pageFetch(videoFixture));
+    const m = await ad.resolve(VIDEO_URL);
+    expect(m.video?.proxyHeaders?.Cookie).toBeUndefined();
+    expect(m.video?.proxyHeaders?.["User-Agent"]).toBe(CHROME_UA);
+  });
+
   test("video: falls back to video.playAddr when bitrateInfo is empty", async () => {
     const noBitrate = structuredClone(videoFixture) as typeof videoFixture & {
       __DEFAULT_SCOPE__: {

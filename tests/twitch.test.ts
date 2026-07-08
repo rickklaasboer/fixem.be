@@ -1,10 +1,17 @@
 import {describe, expect, test} from 'bun:test';
-import {createTwitchAdapter} from '../src/adapters/twitch';
+import TwitchAdapter from '../src/adapters/TwitchAdapter';
+import Config from '../src/config/Config';
+import HttpClient from '../src/services/HttpClient';
 import type {FetchFn} from '../src/adapters/types';
 import helixClip from './fixtures/twitch/helix-clip.json';
 import gqlClip from './fixtures/twitch/gql-clip.json';
 
-const CREDS = {clientId: 'cid', clientSecret: 'sec'};
+const CONFIG = {
+    twitchClientId: 'cid',
+    twitchClientSecret: 'sec',
+    twitchGqlClientId: 'gqlcid',
+    twitchGqlClipHash: 'gqlhash',
+} as unknown as Config;
 
 function fakeFetch(opts: {gqlBody?: unknown; helixFirst401?: boolean} = {}) {
     const requests: {url: string; auth?: string; body?: string}[] = [];
@@ -45,7 +52,7 @@ const CLIP_URL = new URL(
 );
 
 describe('twitch adapter', () => {
-    const a = createTwitchAdapter(CREDS, fakeFetch().fetchFn);
+    const a = new TwitchAdapter(CONFIG, new HttpClient(fakeFetch().fetchFn));
 
     test('match covers both clip URL shapes, rejects non-clips', () => {
         expect(a.match(CLIP_URL)).toBe(true);
@@ -90,7 +97,7 @@ describe('twitch adapter', () => {
 
     test('resolves metadata + signed MP4, caches app token', async () => {
         const {fetchFn, requests} = fakeFetch();
-        const ad = createTwitchAdapter(CREDS, fetchFn);
+        const ad = new TwitchAdapter(CONFIG, new HttpClient(fetchFn));
         const m = await ad.resolve(CLIP_URL);
         expect(m.kind).toBe('video');
         expect(m.title).toBe('Unbelievable clutch play');
@@ -111,7 +118,7 @@ describe('twitch adapter', () => {
 
     test('401 from helix re-mints token and retries once', async () => {
         const {fetchFn, requests} = fakeFetch({helixFirst401: true});
-        const ad = createTwitchAdapter(CREDS, fetchFn);
+        const ad = new TwitchAdapter(CONFIG, new HttpClient(fetchFn));
         const m = await ad.resolve(CLIP_URL);
         expect(m.title).toBe('Unbelievable clutch play');
         expect(
@@ -121,7 +128,7 @@ describe('twitch adapter', () => {
 
     test('GQL failure degrades to image-only embed (no throw)', async () => {
         const {fetchFn} = fakeFetch({gqlBody: {data: {clip: null}}});
-        const ad = createTwitchAdapter(CREDS, fetchFn);
+        const ad = new TwitchAdapter(CONFIG, new HttpClient(fetchFn));
         const m = await ad.resolve(CLIP_URL);
         expect(m.kind).toBe('image');
         expect(m.video).toBeUndefined();
@@ -130,19 +137,19 @@ describe('twitch adapter', () => {
 
     test('clip not found throws', async () => {
         const {fetchFn} = fakeFetch();
-        const ad = createTwitchAdapter(CREDS, (async (
-            input: unknown,
-            init?: RequestInit,
-        ) => {
-            const url = String(input);
-            if (url.includes('oauth2/token'))
-                return new Response(
-                    JSON.stringify({access_token: 't', expires_in: 100}),
-                );
-            if (url.includes('helix/clips'))
-                return new Response(JSON.stringify({data: []}));
-            return fetchFn(input as Parameters<FetchFn>[0], init);
-        }) as unknown as FetchFn);
+        const ad = new TwitchAdapter(
+            CONFIG,
+            new HttpClient((async (input: unknown, init?: RequestInit) => {
+                const url = String(input);
+                if (url.includes('oauth2/token'))
+                    return new Response(
+                        JSON.stringify({access_token: 't', expires_in: 100}),
+                    );
+                if (url.includes('helix/clips'))
+                    return new Response(JSON.stringify({data: []}));
+                return fetchFn(input as Parameters<FetchFn>[0], init);
+            }) as unknown as FetchFn),
+        );
         expect(ad.resolve(CLIP_URL)).rejects.toThrow('twitch: clip not found');
     });
 });

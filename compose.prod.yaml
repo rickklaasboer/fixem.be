@@ -1,0 +1,54 @@
+# Deployment compose — runs the prebuilt image from GHCR (no local build).
+#
+#   docker compose -f compose.prod.yaml pull      # fetch the newest image
+#   docker compose -f compose.prod.yaml up -d      # (re)start
+#
+# Pin a specific release instead of the latest by setting FIXEM_TAG, e.g.
+#   FIXEM_TAG=1.0.0 docker compose -f compose.prod.yaml up -d
+#
+# Put real config (PUBLIC_BASE_URL, PROXY_SECRET, platform creds, …) in a local
+# .env file next to this compose. See .env.example / README "Configuration".
+services:
+  app:
+    image: ghcr.io/rickklaasboer/fixem.be:${FIXEM_TAG:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    # Loopback only: terminate TLS and forward the real client IP from a reverse
+    # proxy in front (see README "Deployment"). Do NOT serve /v/ video through
+    # Cloudflare's orange cloud.
+    ports:
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # The image ships Bun; no curl/wget needed. Assumes the default PORT=3000.
+      test:
+        - CMD
+        - bun
+        - -e
+        - "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  redis:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis-data:

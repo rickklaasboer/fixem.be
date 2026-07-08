@@ -49,6 +49,9 @@ export function parseTargetUrl(pathname: string, search: string): ParsedTarget {
   }
 
   const params = new URLSearchParams(search);
+  // `fixem` is our reserved namespace (the diagnostic hatch now lives at the
+  // `/preview/` path, not this param). Strip it so a stray/legacy one never
+  // leaks into the target URL we redirect to.
   params.delete("fixem");
   const qs = params.toString();
   // Re-attached params must land before any fragment, never inside it.

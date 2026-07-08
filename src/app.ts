@@ -91,16 +91,21 @@ export function buildApp(deps: AppDeps): Hono {
   mountProxy(app, { config, logger, rateLimitStore, now });
 
   app.get("*", async (c) => {
-    const parsed = parseTargetUrl(c.req.path, new URL(c.req.url).search.slice(1));
+    // The human-facing diagnostic hatch is `/preview/<wrapped-url>`. Strip the
+    // prefix before parsing so the rest flows through exactly like a normal
+    // wrapped URL. No collision: a wrapped target always starts with a scheme or
+    // bare host-with-dot, so its first path segment is never literally `preview`.
+    const preview = c.req.path.startsWith("/preview/");
+    const targetPath = preview ? c.req.path.slice("/preview".length) : c.req.path;
+    const parsed = parseTargetUrl(targetPath, new URL(c.req.url).search.slice(1));
     if (!parsed.ok) return c.text(USAGE_HINT, 400);
 
     const ua = c.req.header("User-Agent");
     const crawler = isCrawler(ua, config.extraCrawlerUas);
-    const preview = c.req.query("fixem") === "preview";
 
     if (!crawler) {
       // Rate limit everything that isn't a known crawler — including
-      // ?fixem=preview, so the debug hatch can't bypass throttling into
+      // /preview/, so the debug hatch can't bypass throttling into
       // the resolver (spec §6).
       const hits = await rateLimitStore.hit(clientIp(c.req.raw.headers), 60_000, now());
       if (hits > config.rateLimitPerMin) return c.text("rate limited, try again shortly", 429);
@@ -117,7 +122,7 @@ export function buildApp(deps: AppDeps): Hono {
 
     const outcome = await resolver.resolve(parsed.url);
     if (outcome.status === "no-adapter") {
-      // Crawlers get a bare redirect (no embed to build). Under ?fixem=preview,
+      // Crawlers get a bare redirect (no embed to build). Under /preview/,
       // that redirect is invisible/confusing when debugging, so show why instead.
       if (preview) return c.html(renderPreviewNoAdapter(parsed.url.href));
       return c.redirect(parsed.url.href, 302);

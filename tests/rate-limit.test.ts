@@ -1,10 +1,8 @@
 import {describe, expect, test} from 'bun:test';
 import type {RedisClient} from 'bun';
-import {
-    clientIp,
-    MemoryRateLimitStore,
-    RedisRateLimitStore,
-} from '../src/lib/rate-limit';
+import MemoryRateLimitStore from '@/services/MemoryRateLimitStore';
+import RateLimitStore from '@/services/RateLimitStore';
+import RedisRateLimitStore from '@/services/RedisRateLimitStore';
 
 describe('MemoryRateLimitStore', () => {
     test('counts hits within window, expires old ones', async () => {
@@ -33,10 +31,10 @@ describe('RedisRateLimitStore fail-open', () => {
     });
 });
 
-describe('clientIp', () => {
+describe('RateLimitStore.clientIp', () => {
     test('prefers CF-Connecting-IP, then X-Forwarded-For, then unknown', () => {
         expect(
-            clientIp(
+            RateLimitStore.clientIp(
                 new Headers({
                     'CF-Connecting-IP': '1.2.3.4',
                     'X-Forwarded-For': '9.9.9.9',
@@ -44,8 +42,10 @@ describe('clientIp', () => {
             ),
         ).toBe('1.2.3.4');
         expect(
-            clientIp(new Headers({'X-Forwarded-For': '5.6.7.8, 10.0.0.1'})),
+            RateLimitStore.clientIp(
+                new Headers({'X-Forwarded-For': '5.6.7.8, 10.0.0.1'}),
+            ),
         ).toBe('5.6.7.8');
-        expect(clientIp(new Headers())).toBe('unknown');
+        expect(RateLimitStore.clientIp(new Headers())).toBe('unknown');
     });
 });

@@ -1,41 +1,104 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>fixem.be — fix social embeds in Discord</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fixem.be — Working Discord embeds for broken social links.</title>
+<meta name="description" content="Prepend fixem.be/ to a social link for working Discord embeds.">
+<meta name="theme-color" content="#5058e0">
+<meta name="color-scheme" content="light">
 <meta property="og:title" content="fixem.be">
-<meta property="og:description" content="Prepend fixem.be/ to a social media link to get working embeds in Discord.">
+<meta property="og:description" content="Prepend fixem.be/ to a social link for working Discord embeds.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: dark; }
-  body { margin: 0; min-height: 100vh; display: grid; place-items: center;
-         background: #111214; color: #e4e6ea; font: 16px/1.6 system-ui, sans-serif; }
-  main { max-width: 42rem; padding: 3rem 1.5rem; }
-  h1 { font-size: 2.5rem; margin: 0 0 .25rem; }
-  h1 + p { color: #949ba4; margin-top: 0; }
-  code { background: #1e1f22; border-radius: 6px; padding: .15rem .4rem; font-size: .95em; }
-  .example { background: #1e1f22; border-radius: 10px; padding: 1rem 1.25rem; margin: 1rem 0;
-             overflow-x: auto; white-space: nowrap; }
-  .example span { color: #23a55a; font-weight: 600; }
-  footer { margin-top: 2.5rem; color: #949ba4; font-size: .875rem; }
-  a { color: #00a8fc; }
+  :root { --bg:#f7f7f5; --text:#16171d; --muted:#6a6d78; --accent:#5058e0; --line:#e2e2dd; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:var(--bg); color:var(--text);
+    font-family:"JetBrains Mono", ui-monospace, monospace;
+    min-height:100dvh; display:grid; place-items:center;
+    padding:24px; line-height:1.6;
+  }
+  main { max-width:560px; }
+  h1 { font-size:clamp(34px,10vw,52px); letter-spacing:-.03em; color:var(--accent); }
+  h1 span { color:var(--text); }
+  p { color:var(--muted); font-size:15px; margin-top:14px; }
+  p b { color:var(--accent); font-weight:400; }
+  code {
+    display:block; margin-top:22px; padding:13px 15px;
+    background:#fff; border:1px solid var(--line); border-radius:6px; font-size:13px;
+    color:var(--muted); overflow-x:auto; white-space:nowrap;
+  }
+  code b { color:var(--accent); font-weight:400; }
+  .slot { display:inline-block; height:1.6em; overflow:hidden; vertical-align:top; }
+  .reel { display:block; }
+  .reel span { display:block; height:1.6em; line-height:1.6em; }
+  .reel.roll { transition:transform .55s cubic-bezier(.5,0,.15,1); }
+  h2 { font-size:13px; font-weight:700; color:var(--text); margin-top:30px; letter-spacing:.02em; }
+  ul { list-style:none; margin-top:10px; display:flex; flex-wrap:wrap; gap:6px 10px; }
+  li { color:var(--muted); font-size:13px; }
+  li::before { content:"\203A"; color:var(--accent); margin-right:6px; }
+  .tip { margin-top:22px; font-size:13px; }
+  .tip code { display:inline; margin:0; padding:2px 6px; white-space:normal; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  footer { margin-top:30px; font-size:13px; }
+  footer a { display:inline-flex; align-items:center; gap:8px; }
+  footer svg { width:16px; height:16px; fill:currentColor; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+  @media (prefers-reduced-motion: reduce) { .reel.roll { transition:none; } }
 </style>
 </head>
 <body>
-<main>
-  <h1>fixem.be</h1>
-  <p>Fix broken social media embeds in Discord.</p>
-  <p>Prepend <code>fixem.be/</code> to a link before posting it:</p>
-  <div class="example"><span>https://fixem.be/</span>https://www.reddit.com/r/pics/comments/abc123/example/</div>
-  <div class="example"><span>https://fixem.be/</span>https://bsky.app/profile/user.bsky.social/post/xyz789</div>
-  <div class="example"><span>https://fixem.be/</span>https://x.com/user/status/1234567890123456789</div>
-  <div class="example"><span>https://fixem.be/</span>https://clips.twitch.tv/FunnyClipSlug</div>
-  <div class="example"><span>https://fixem.be/</span>https://www.tiktok.com/@user/video/7311234567890123456</div>
-  <div class="example"><span>https://fixem.be/</span>https://www.threads.com/@user/post/AbCdEfGhIjK</div>
-  <div class="example"><span>https://fixem.be/</span>https://www.instagram.com/p/AbCdEfGhIjK/</div>
-  <p>Discord's crawler gets a rich embed; everyone who clicks lands on the original post.</p>
-  <p>Debugging? Append <code>?fixem=preview</code> to view the embed HTML in your browser.</p>
-  <footer>Not affiliated with any of the linked platforms.</footer>
-</main>
+  <main>
+    <h1>fixem<span>.be</span></h1>
+    <p>Working Discord embeds for broken social links. Prepend <b>fixem.be/</b> to a link before you post it — crawlers get a rich embed, humans land on the original.</p>
+    <code><b>fixem.be/</b><span class="slot"><span class="reel" id="reel"></span></span></code>
+
+    <h2>SUPPORTED</h2>
+    <ul>
+      <li>Reddit</li><li>Bluesky</li><li>Twitter / X</li><li>Twitch clips</li>
+      <li>TikTok</li><li>Instagram</li><li>Threads</li>
+    </ul>
+
+    <p class="tip">Debugging? Append <code>?fixem=preview</code> to any link to inspect the embed HTML in your browser.</p>
+
+    <footer><a href="https://github.com/rickklaasboer/fixem.be"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github.com/rickklaasboer/fixem.be</a></footer>
+  </main>
+  <script>
+    (function () {
+      var urls = [
+        "reddit.com/r/aww/comments/789",
+        "bsky.app/profile/user/post/xyz",
+        "twitter.com/user/status/456",
+        "clips.twitch.tv/FunnyClip",
+        "tiktok.com/@user/video/123",
+        "instagram.com/reel/abc"
+      ];
+      var reel = document.getElementById("reel");
+      var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      urls.concat(urls[0]).forEach(function (u) {
+        var s = document.createElement("span");
+        s.textContent = u;
+        reel.appendChild(s);
+      });
+      if (reduce) return;
+      var i = 0;
+      setInterval(function () {
+        i++;
+        reel.classList.add("roll");
+        reel.style.transform = "translateY(-" + (i * 1.6) + "em)";
+        if (i === urls.length) {
+          setTimeout(function () {
+            reel.classList.remove("roll");
+            reel.style.transform = "translateY(0)";
+            i = 0;
+          }, 560);
+        }
+      }, 2400);
+    })();
+  </script>
 </body>
 </html>

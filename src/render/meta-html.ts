@@ -72,14 +72,23 @@ export function renderMetaHtml(
     if (meta.image.height) lines.push(tag("property", "og:image:height", meta.image.height));
   }
 
+  // Body styling is self-contained (system monospace, no external font) — this
+  // page is crawler-facing; a human only sees it via ?fixem=preview or if the
+  // meta-refresh fails. It echoes the fixem.be landing palette.
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 ${lines.join("\n")}
 <link rel="alternate" type="application/json+oembed" href="${esc(opts.oembedUrl)}" title="${esc(meta.author?.name ?? meta.siteName)}">
-${refresh ? `<meta http-equiv="refresh" content="0;url=${esc(meta.originalUrl)}">\n` : ""}</head>
+${refresh ? `<meta http-equiv="refresh" content="0;url=${esc(meta.originalUrl)}">\n` : ""}<style>
+:root{color-scheme:light}
+body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:24px;background:#f7f7f5;color:#6a6d78;font:14px/1.6 ui-monospace,"JetBrains Mono",monospace}
+a{color:#5058e0;text-decoration:none}a:hover{text-decoration:underline}
+</style>
+</head>
 <body>
 <p>Redirecting to <a href="${esc(meta.originalUrl)}">${esc(meta.originalUrl)}</a></p>
 </body>

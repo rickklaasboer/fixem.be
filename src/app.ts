@@ -111,6 +111,53 @@ export function buildApp(deps: AppDeps): Hono {
         return c.json(renderOembed(outcome.meta, config.publicBaseUrl));
     });
 
+    // Machine-readable adapter health for status monitoring (Gatus et al.).
+    // Mirrors /preview/ but as single-line JSON so uptime checkers can assert on
+    // it with JSONPath — glob/pattern matchers can't reliably match the
+    // multi-line /preview/ HTML. Never throws (resolve() is guaranteed safe);
+    // every matched, well-formed URL returns 200 with an outcome the checker
+    // discriminates on (e.g. hasMedia == true, or platform == "threads").
+    app.get('/status/adapter', async (c) => {
+        if (!isCrawler(c.req.header('User-Agent'), config.extraCrawlerUas)) {
+            const hits = await rateLimitStore.hit(
+                clientIp(c.req.raw.headers),
+                60_000,
+                now(),
+            );
+            if (hits > config.rateLimitPerMin)
+                return c.text('rate limited, try again shortly', 429);
+        }
+        const raw = c.req.query('url');
+        if (!raw) return c.json({error: 'unknown url'}, 400);
+        let url: URL;
+        try {
+            url = new URL(raw);
+        } catch {
+            return c.json({error: 'unknown url'}, 400);
+        }
+        const outcome = await resolver.resolve(url);
+        if (outcome.status === 'no-adapter')
+            return c.json({platform: 'none', status: 'no-adapter', hasMedia: false});
+        if (outcome.status === 'degraded')
+            return c.json({
+                platform: outcome.platform,
+                status: 'degraded',
+                reason: outcome.reason,
+                kind: 'link',
+                hasMedia: false,
+                canonicalUrl: outcome.canonicalUrl,
+            });
+        return c.json({
+            platform: outcome.platform,
+            status: 'ok',
+            kind: outcome.meta.kind,
+            hasMedia: Boolean(outcome.meta.image || outcome.meta.video),
+            cacheHit: outcome.cacheHit,
+            canonicalUrl: outcome.canonicalUrl,
+            title: outcome.meta.title,
+        });
+    });
+
     mountProxy(app, {config, logger, rateLimitStore, now});
 
     app.get('*', async (c) => {

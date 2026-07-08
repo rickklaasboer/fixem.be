@@ -178,6 +178,74 @@ describe('routes', () => {
         expect((await get(makeApp(), '/oembed', DISCORD_UA)).status).toBe(404);
     });
 
+    test('GET /status/adapter reports media JSON for a matched URL', async () => {
+        const res = await get(
+            makeApp(),
+            `/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`,
+            BROWSER_UA,
+        );
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as Record<string, unknown>;
+        expect(body.platform).toBe('dummy');
+        expect(body.status).toBe('ok');
+        expect(body.kind).toBe('image');
+        expect(body.hasMedia).toBe(true);
+    });
+
+    test('GET /status/adapter reports no-adapter for an unmatched URL', async () => {
+        const res = await get(
+            makeApp(),
+            `/status/adapter?url=${encodeURIComponent('https://unknown-platform.dev/x')}`,
+            BROWSER_UA,
+        );
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as Record<string, unknown>;
+        expect(body.status).toBe('no-adapter');
+        expect(body.hasMedia).toBe(false);
+    });
+
+    test('GET /status/adapter reports degraded (no media) when the adapter fails', async () => {
+        const failing = {
+            name: 'broken',
+            match: (u: URL) => u.hostname === 'broken.test',
+            canonicalize: (u: URL) => `https://broken.test${u.pathname}`,
+            resolve: async () => {
+                throw new Error('scraper died');
+            },
+        };
+        const resolver = new Resolver({
+            registry: new AdapterRegistry([failing]),
+            cache: new MemoryCache(),
+            logger: createLogger({write: () => {}}),
+            ttlSeconds: 60,
+            timeoutMs: 100,
+        });
+        const res = await get(
+            makeApp({resolver}),
+            `/status/adapter?url=${encodeURIComponent('https://broken.test/post/1')}`,
+            BROWSER_UA,
+        );
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as Record<string, unknown>;
+        expect(body.platform).toBe('broken');
+        expect(body.status).toBe('degraded');
+        expect(body.hasMedia).toBe(false);
+    });
+
+    test('GET /status/adapter 400s for a missing url', async () => {
+        const res = await get(makeApp(), '/status/adapter', BROWSER_UA);
+        expect(res.status).toBe(400);
+    });
+
+    test('status/adapter is rate limited for browsers, crawlers exempt', async () => {
+        const config = loadConfig({RATE_LIMIT_PER_MIN: '1'});
+        const app = makeApp({config});
+        const path = `/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`;
+        expect((await get(app, path, BROWSER_UA)).status).toBe(200);
+        expect((await get(app, path, BROWSER_UA)).status).toBe(429);
+        expect((await get(app, path, DISCORD_UA)).status).toBe(200); // crawler unaffected
+    });
+
     test('browser requests are rate limited, crawlers exempt', async () => {
         const config = loadConfig({RATE_LIMIT_PER_MIN: '2'});
         const app = makeApp({config});

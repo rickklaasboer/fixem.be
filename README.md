@@ -1,5 +1,12 @@
 # fixem.be
 
+[![CI](https://github.com/rickklaasboer/fixem.be/actions/workflows/ci.yml/badge.svg)](https://github.com/rickklaasboer/fixem.be/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/rickklaasboer/fixem.be?sort=semver&label=release)](https://github.com/rickklaasboer/fixem.be/releases)
+[![Container image](https://img.shields.io/badge/ghcr.io-fixem.be-2496ED?logo=docker&logoColor=white)](https://github.com/rickklaasboer/fixem.be/pkgs/container/fixem.be)
+[![Runtime: Bun](https://img.shields.io/badge/runtime-Bun-14151A?logo=bun&logoColor=white)](https://bun.sh)
+[![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
+[![Donate](https://img.shields.io/badge/donate-PayPal-00457C?logo=paypal&logoColor=white)](https://www.paypal.com/paypalme/rickklaasboer)
+
 **fixem.be** fixes broken social-media link previews. Many platforms serve
 crawlers a bare page with no useful Open Graph tags, so links posted to Discord,
 Telegram, Slack and friends show up without an image, title, or video. Prepend
@@ -138,35 +145,47 @@ merge to `main` (see the CI pipeline in `.github/workflows/`).
 ## Configuration
 
 All configuration is via environment variables. Copy `.env.example` to `.env`
-and edit as needed; every value has a sane default (see `src/lib/config.ts`).
+and edit as needed; every value has a sane default (see `src/lib/config.ts`), so
+an empty `.env` still runs a working — if platform-limited — service.
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `PORT` | `3000` | TCP port the HTTP server listens on. |
-| `PUBLIC_BASE_URL` | `https://fixem.be` | Externally reachable base URL. Used to build the oEmbed discovery link and provider URLs embedded in responses; set it to your real public origin. |
+| `PUBLIC_BASE_URL` | `https://fixem.be` | Externally reachable base URL, used to build the oEmbed discovery link and provider URLs in responses. Set it to your real public origin. |
 | `REDIS_URL` | `redis://localhost:6379` | Redis/Valkey connection URL. Backs both the metadata cache and the rate-limit store. |
 | `CACHE_TTL_SECONDS` | `14400` | How long resolved metadata stays cached (default 4 hours). |
-| `RESOLVE_TIMEOUT_MS` | `5000` | Per-adapter resolve timeout. A slower upstream degrades to a minimal embed rather than hanging. |
+| `RESOLVE_TIMEOUT_MS` | `5000` | Per-adapter resolve timeout. A slow upstream degrades to a minimal embed rather than hanging. |
 | `RATE_LIMIT_PER_MIN` | `60` | Max requests per client IP per minute for non-crawler traffic. Crawlers are exempt. |
-| `EXTRA_CRAWLER_UAS` | *(empty)* | Comma-separated extra `User-Agent` substrings (case-insensitive) to treat as crawlers, in addition to the built-in list. |
-| `TWITCH_CLIENT_ID` | *(empty)* | Twitch app client ID. Required to enable Twitch clip embeds; register an app at [dev.twitch.tv/console](https://dev.twitch.tv/console). The adapter is disabled unless BOTH are set (logged on startup); when disabled, Twitch links fall through. |
-| `TWITCH_CLIENT_SECRET` | *(empty)* | Twitch app client secret (pairs with `TWITCH_CLIENT_ID`). |
-| `TWITCH_GQL_CLIENT_ID` | *(pinned)* | Twitch's public web client ID, used for the clip video (GraphQL) call. Override **only** if Twitch rotates its public web constants; the pinned default lives in `src/adapters/twitch.ts`. |
-| `TWITCH_GQL_CLIP_HASH` | *(pinned)* | Persisted-query hash for the clip playback-access-token GraphQL call. Override **only** if Twitch rotates its public web constants. |
-| `TWITTER_SYNDICATION_FEATURES` | *(pinned)* | Semicolon-joined feature flags sent to the X/Twitter syndication endpoint. Override **only** if X changes the flags it requires; the pinned default lives in `src/adapters/twitter.ts`. |
-| `REDDIT_CLIENT_ID` | *(empty)* | Reddit app client ID (optional). Reddit disabled its anonymous `.json` API (returns 403), so by default the adapter scrapes **old.reddit.com** HTML — this works for images/galleries/text/NSFW but yields only a **poster image** for videos. With credentials, it uses the OAuth API (`oauth.reddit.com`) for full data incl. muxed video. NOTE: Reddit's self-serve API keys were removed in 2025; credentials now require approval via their Responsible Builder Policy. |
-| `REDDIT_CLIENT_SECRET` | *(empty)* | Reddit app client secret (optional, pairs with `REDDIT_CLIENT_ID`). |
+| `EXTRA_CRAWLER_UAS` | *(empty)* | Comma-separated extra `User-Agent` substrings (case-insensitive) to treat as crawlers, on top of the built-in list. |
 | `PROXY_SECRET` | *(empty)* | HMAC key that signs `/v/` media-proxy URLs. **Set it to a random string to enable inline video** for TikTok/Threads/Instagram; blank disables the proxy and those platforms degrade to a thumbnail or link. See [Video proxy](#video-proxy). |
-| `PROXY_HOST_ALLOWLIST` | *(pinned)* | Comma-separated CDN hosts the proxy may fetch (suffix match). The proxy is **not** an open proxy — only allowlisted hosts are reachable even with a valid token. Blank uses the built-in default list in `src/lib/config.ts`. |
+| `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` | *(empty)* | Twitch app credentials ([register an app](https://dev.twitch.tv/console)). Both are required to enable Twitch clips; without them the adapter is disabled at startup and Twitch links fall through. |
+| `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | *(empty)* | Optional Reddit OAuth credentials. Without them the adapter scrapes old.reddit.com HTML (video → poster image only); with them it uses the OAuth API for full data incl. muxed video. Self-serve keys are approval-gated since 2025. |
+| `INSTAGRAM_PROXY_URL` | *(empty)* | Optional residential-proxy offload prefix; the target URL is appended (URL-encoded). Instagram is usually login-walled from datacenter IPs, so a direct fetch (blank) typically fails. |
+| `INSTAGRAM_COOKIE` | *(empty)* | Optional logged-in session cookie (use a **burner** — IG bans scraping accounts) to get past the login wall. Minimum `sessionid=…` (add `csrftoken`/`ds_user_id` for fewer challenges). A full account credential: never logged, never placed in `/v/` tokens, gitignored. Expect an expiry/ban rotation treadmill. |
+| `INSTAGRAM_SNAPSAVE` | `false` | Opt-in last-resort fallback (`"true"` to enable): when our own fetch is login-walled, resolve via snapsave.app. Best-effort and **fragile** — it leans on third-party services and may break without notice. |
+
+<details>
+<summary><strong>Advanced &amp; version-pinned variables</strong> — proxy tuning and platform web-client constants you shouldn't normally need to touch</summary>
+
+<br>
+
+All of these ship with working pinned defaults. The platform constants only need
+overriding if a platform rotates its public web-client values; each default
+lives next to its adapter in `src/adapters/`.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PROXY_HOST_ALLOWLIST` | *(pinned)* | Comma-separated CDN hosts the proxy may fetch (suffix match). The proxy is **not** open — only allowlisted hosts are reachable even with a valid token. Blank uses the built-in list. |
 | `PROXY_MAX_CONCURRENT` | `32` | Max simultaneous in-flight proxied streams (back-pressure guardrail). |
-| `PROXY_MAX_BYTES` | `104857600` | Max bytes streamed per proxied response (100 MiB); a hostile/huge upstream is cut off. |
+| `PROXY_MAX_BYTES` | `104857600` | Max bytes per proxied response (100 MiB); a hostile/huge upstream is cut off. |
 | `PROXY_TIMEOUT_MS` | `10000` | Upstream fetch timeout for the media proxy. |
-| `THREADS_LSD` / `THREADS_DOC_ID` / `THREADS_APP_ID` / `THREADS_FRIENDLY_NAME` | *(pinned)* | Threads public web-client constants. Override **only** if Meta rotates them; the pinned defaults live in `src/adapters/threads.ts`. |
-| `TIKTOK_MOBILE_API_HOST` / `TIKTOK_IID` / `TIKTOK_DEVICE_ID` | *(pinned)* | TikTok public web-client constants. Override **only** if TikTok rotates them; the pinned defaults live in `src/adapters/tiktok.ts`. |
-| `INSTAGRAM_DOC_ID` / `INSTAGRAM_APP_ID` / `INSTAGRAM_FRIENDLY_NAME` | *(pinned)* | Instagram public web-client constants. Override **only** if Meta rotates them; the pinned defaults live in `src/adapters/instagram.ts`. |
-| `INSTAGRAM_PROXY_URL` | *(empty)* | Optional residential-proxy offload prefix. Instagram is usually blocked from datacenter IPs; the target URL is appended (URL-encoded) to this prefix. Blank = direct fetch (which typically hits a login wall from a datacenter). |
-| `INSTAGRAM_COOKIE` | *(empty)* | Optional logged-in session cookie (use a **burner** — IG bans scraping accounts) to authenticate past the login wall. Minimum `sessionid=…`; add `csrftoken`/`ds_user_id` for fewer challenges. A full account credential: never logged, never placed in `/v/` tokens, gitignored. Expect expiry/bans — a rotation treadmill. |
-| `INSTAGRAM_SNAPSAVE` | `false` | Opt-in last-resort fallback (`"true"` to enable): when our own fetch is login-walled, resolve via **snapsave.app**. Best-effort and **fragile** — it depends on two third-party services (snapsave.app + its rapidcdn.app delivery CDN) and may break without notice when they rotate their scheme. Media is served from rapidcdn.app, not Instagram. |
+| `TWITCH_GQL_CLIENT_ID` / `TWITCH_GQL_CLIP_HASH` | *(pinned)* | Twitch's public web client ID and clip persisted-query hash, used for the clip video (GraphQL) call. |
+| `TWITTER_SYNDICATION_FEATURES` | *(pinned)* | Semicolon-joined feature flags sent to the X/Twitter syndication endpoint. |
+| `THREADS_LSD` / `THREADS_DOC_ID` / `THREADS_APP_ID` / `THREADS_FRIENDLY_NAME` | *(pinned)* | Threads public web-client constants. |
+| `TIKTOK_MOBILE_API_HOST` / `TIKTOK_IID` / `TIKTOK_DEVICE_ID` | *(pinned)* | TikTok public web-client constants. |
+| `INSTAGRAM_DOC_ID` / `INSTAGRAM_APP_ID` / `INSTAGRAM_FRIENDLY_NAME` | *(pinned)* | Instagram public web-client constants. |
+
+</details>
 
 ### Redis outages degrade gracefully
 
@@ -251,37 +270,27 @@ and can break the tags crawlers parse. Leave `User-Agent` pass-through on.
 
 ## Supported platforms
 
-| Platform | Status | Coverage |
-|---|---|---|
-| `example.com` (dummy adapter) | Available now (M1) | Smoke-test target |
-| Reddit | Available now (M2) | Anonymous by default via old.reddit.com HTML (images, galleries, text, link previews, NSFW; **video posts show a poster image only**). With OAuth credentials: full JSON incl. muxed video and richer crosspost media. Reddit's anonymous `.json` API is dead and self-serve API keys are approval-gated (2025 Responsible Builder Policy). |
-| Bluesky | Available now (M2) | Images, video thumbnail, quotes, external links |
-| Twitch | Available now (M3) | Clips — title, broadcaster, view count, thumbnail, and inline MP4 (needs `TWITCH_CLIENT_ID`/`TWITCH_CLIENT_SECRET`). |
-| Twitter/X | Available now (M3) | Tweets — text, photos, inline MP4 video, quoted-tweet preview, NSFW marker. No credentials required. |
-| TikTok | Available now (M4) | Videos and photo posts — title, author, description, thumbnail, and inline video streamed through the `/v/` proxy (needs `PROXY_SECRET`). Short links (`vm.`/`vt.tiktok.com`) resolve. No credentials required. |
-| Threads | Available now (M4) | Posts — text, images, carousels, and inline video streamed through the `/v/` proxy (needs `PROXY_SECRET`). No credentials required. |
-| Instagram | Available now (M4) | Posts, reels, and carousels **when reachable**. Instagram is often blocked from datacenter IPs and returns a login wall — in that case the embed **degrades to an explanatory link** (by design, not a failure). Set `INSTAGRAM_PROXY_URL` to a residential offload to improve reliability. Inline video needs `PROXY_SECRET`. No credentials required. |
+| Platform | Coverage |
+|---|---|
+| `example.com` (dummy adapter) | Network-free smoke-test target for the full crawler → resolve → cache → render pipeline. |
+| Reddit | Images, galleries, text, link previews, and NSFW via old.reddit.com HTML (**video posts show a poster image only**). With `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET`, the OAuth API adds muxed video and richer crosspost media. Reddit's anonymous `.json` API is dead and self-serve keys are approval-gated (2025 Responsible Builder Policy). |
+| Bluesky | Images, video thumbnail, quotes, external links. No credentials required. |
+| Twitch | Clips — title, broadcaster, view count, thumbnail, and inline MP4. Needs `TWITCH_CLIENT_ID`/`TWITCH_CLIENT_SECRET`; without them the adapter is disabled at startup and Twitch links fall through. |
+| Twitter/X | Tweets — text, photos, inline MP4, quoted-tweet preview, NSFW marker. No credentials required. |
+| TikTok | Videos and photo posts — title, author, description, thumbnail, and inline video via the `/v/` proxy (needs `PROXY_SECRET`). Short links (`vm.`/`vt.tiktok.com`) resolve. No credentials required. |
+| Threads | Posts — text, images, carousels, and inline video via the `/v/` proxy (needs `PROXY_SECRET`). No credentials required. |
+| Instagram | Posts, reels, and carousels **when reachable**. Often blocked from datacenter IPs behind a login wall — the embed then **degrades to an explanatory link** (by design). Set `INSTAGRAM_PROXY_URL` for a residential offload; inline video needs `PROXY_SECRET`. No credentials required. |
 
-The dummy `example.com` adapter ships in M1 so the full pipeline can be verified
-end-to-end (including against real Discord) without any platform dependency.
-Reddit and Bluesky adapters land in M2, Twitch and Twitter/X in M3, and Threads,
-Instagram, and TikTok in M4 (alongside the `/v/` video proxy).
+A few limitations worth knowing:
 
-Bluesky video currently embeds as a **thumbnail** rather than an inline player:
-Bluesky serves video as HLS (`.m3u8`), which Discord's `og:video` player won't
-fetch — the `/v/` proxy streams progressive MP4, not HLS.
-
-**Twitch** requires a Twitch app (`TWITCH_CLIENT_ID`/`TWITCH_CLIENT_SECRET`,
-registered at [dev.twitch.tv/console](https://dev.twitch.tv/console)); without
-them the adapter is disabled at startup and Twitch links fall through. Clip video
-is served through a short-lived **signed CDN URL**, so a resolved clip is cached
-for only ~30 minutes rather than the default 4 hours — the signed URL is
-short-lived, so embeds are re-fetched rather than cached long.
-
-**Twitter/X** needs no credentials — it reads the anonymous syndication API. As a
-limitation of that anonymous path, NSFW / age-restricted posts (and deleted or
-withheld ones) can't return media and degrade to a plain text notice instead of a
-full embed.
+- **Bluesky video** embeds as a thumbnail, not an inline player: Bluesky serves
+  HLS (`.m3u8`), which Discord's `og:video` player won't fetch, and the `/v/`
+  proxy streams progressive MP4 rather than HLS.
+- **Twitch clips** play from a short-lived signed CDN URL, so a resolved clip is
+  cached for only ~30 minutes rather than the default 4 hours.
+- **Twitter/X** reads the anonymous syndication API, so NSFW / age-restricted,
+  deleted, or withheld posts can't return media and degrade to a plain text
+  notice.
 
 ---
 
@@ -324,6 +333,18 @@ paths on the orange cloud if you like, but the media stream must not be.
    and retry with a fresh path (Discord caches embeds per-URL aggressively —
    change /hello to /hello2 to bust it).
 ```
+
+---
+
+## Support
+
+fixem.be is free and self-hostable, and the public instance runs on a VPS I pay
+for myself. If it fixed a broken embed for you and you'd like to help cover the
+hosting bill, you can send a few euros my way:
+
+[![Donate with PayPal](https://img.shields.io/badge/donate-PayPal-00457C?logo=paypal&logoColor=white)](https://www.paypal.com/paypalme/rickklaasboer)
+
+It's entirely optional, and appreciated either way. Thanks.
 
 ---
 

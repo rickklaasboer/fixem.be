@@ -1,6 +1,7 @@
 import {describe, expect, test} from 'bun:test';
 import type {RedisClient} from 'bun';
-import {MemoryCache, RedisCache} from '../src/lib/cache';
+import MemoryCache from '@/services/MemoryCache';
+import RedisCache from '@/services/RedisCache';
 
 // A RedisClient whose every command rejects — stands in for an unreachable
 // Redis (enableOfflineQueue:false rejects immediately in production).

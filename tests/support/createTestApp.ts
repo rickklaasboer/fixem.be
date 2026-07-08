@@ -17,6 +17,7 @@ import ProxyStreamer from '@/services/proxy/ProxyStreamer';
 import AdapterRegistry from '@/domain/AdapterRegistry';
 import Resolver from '@/domain/Resolver';
 import ApiAuthMiddleware from '@/http/middleware/ApiAuthMiddleware';
+import ApiRateLimitMiddleware from '@/http/middleware/ApiRateLimitMiddleware';
 import RateLimitMiddleware from '@/http/middleware/RateLimitMiddleware';
 import DummyAdapter from '@/adapters/DummyAdapter';
 import type PlatformAdapter from '@/domain/PlatformAdapter';
@@ -92,6 +93,7 @@ export default function createTestApp(overrides: TestAppOverrides = {}): Hono {
     c.registerSingleton(VideoProxy);
     c.registerSingleton(ProxyStreamer);
     c.registerSingleton(ApiAuthMiddleware);
+    c.registerSingleton(ApiRateLimitMiddleware);
     c.registerSingleton(RateLimitMiddleware);
 
     const server = new Hono();

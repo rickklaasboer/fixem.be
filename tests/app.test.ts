@@ -174,10 +174,10 @@ describe('routes', () => {
             },
         });
 
-    test('GET /api/status/adapter reports media JSON for a matched URL', async () => {
+    test('GET /api/v1/health reports media JSON for a matched URL', async () => {
         const res = await apiGet(
             makeApp({config: apiCfg}),
-            `/api/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`,
+            `/api/v1/health?url=${encodeURIComponent('https://example.com/hello')}`,
         );
         expect(res.status).toBe(200);
         const body = (await res.json()) as Record<string, unknown>;
@@ -187,10 +187,10 @@ describe('routes', () => {
         expect(body.hasMedia).toBe(true);
     });
 
-    test('GET /api/status/adapter reports no-adapter for an unmatched URL', async () => {
+    test('GET /api/v1/health reports no-adapter for an unmatched URL', async () => {
         const res = await apiGet(
             makeApp({config: apiCfg}),
-            `/api/status/adapter?url=${encodeURIComponent('https://unknown-platform.dev/x')}`,
+            `/api/v1/health?url=${encodeURIComponent('https://unknown-platform.dev/x')}`,
         );
         expect(res.status).toBe(200);
         const body = (await res.json()) as Record<string, unknown>;
@@ -198,7 +198,7 @@ describe('routes', () => {
         expect(body.hasMedia).toBe(false);
     });
 
-    test('GET /api/status/adapter reports degraded (no media) when the adapter fails', async () => {
+    test('GET /api/v1/health reports degraded (no media) when the adapter fails', async () => {
         const failing: PlatformAdapter = {
             name: 'broken',
             match: (u) => u.hostname === 'broken.test',
@@ -209,7 +209,7 @@ describe('routes', () => {
         };
         const res = await apiGet(
             makeApp({config: apiCfg, adapters: [failing]}),
-            `/api/status/adapter?url=${encodeURIComponent('https://broken.test/post/1')}`,
+            `/api/v1/health?url=${encodeURIComponent('https://broken.test/post/1')}`,
         );
         expect(res.status).toBe(200);
         const body = (await res.json()) as Record<string, unknown>;
@@ -218,25 +218,23 @@ describe('routes', () => {
         expect(body.hasMedia).toBe(false);
     });
 
-    test('GET /api/status/adapter 400s for a missing url', async () => {
-        const res = await apiGet(
-            makeApp({config: apiCfg}),
-            '/api/status/adapter',
-        );
-        expect(res.status).toBe(400);
+    test('GET /api/v1/health with no url returns liveness', async () => {
+        const res = await apiGet(makeApp({config: apiCfg}), '/api/v1/health');
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({ok: true, redis: true});
     });
 
-    test('/api/* requires a valid bearer token', async () => {
+    test('/api/v1/* requires a valid bearer token', async () => {
         const app = makeApp({config: apiCfg});
-        const path = `/api/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`;
+        const path = '/api/v1/platforms';
         expect((await apiGet(app, path, null)).status).toBe(401); // missing
         expect((await apiGet(app, path, 'wrong-key')).status).toBe(401); // wrong
         expect((await apiGet(app, path, API_KEY)).status).toBe(200); // valid
     });
 
-    test('/api/* is closed (404) when no API_KEYS are configured', async () => {
+    test('/api/v1/* is closed (404) when no API_KEYS are configured', async () => {
         // default makeApp() sets no apiKeys → the API surface is disabled.
-        const path = `/api/status/adapter?url=${encodeURIComponent('https://example.com/hello')}`;
+        const path = '/api/v1/platforms';
         expect((await apiGet(makeApp(), path, API_KEY)).status).toBe(404);
         expect((await apiGet(makeApp(), path, null)).status).toBe(404);
     });

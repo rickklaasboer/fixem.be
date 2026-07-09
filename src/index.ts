@@ -1,11 +1,11 @@
 import 'reflect-metadata';
 import bootstrap from '@/bootstrap';
 import {app} from '@/container';
-import Config from '@/config/Config';
+import AppConfig from '@/config/AppConfig';
 import Logger from '@/services/Logger';
 
 const server = bootstrap();
-const config = app(Config);
+const config = app(AppConfig);
 
 app(Logger).info({port: config.port}, 'fixem.be listening');
 

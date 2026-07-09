@@ -3,7 +3,6 @@ import {Hono} from 'hono';
 import type {InjectionToken} from 'tsyringe';
 import {container} from '@/container';
 import routes from '@/http/routes';
-import Config, {loadConfig} from '@/config/Config';
 import Logger from '@/services/Logger';
 import HttpClient from '@/services/HttpClient';
 import Cache from '@/services/cache/Cache';
@@ -41,12 +40,21 @@ const rateLimitStoreToken =
     RateLimitStore as unknown as InjectionToken<RateLimitStore>;
 
 export interface TestAppOverrides {
-    /** Partial config merged over a defaults-only base (`loadConfig({})`). */
-    config?: Partial<Config>;
+    app?: Partial<AppConfig>;
+    resolver?: Partial<ResolverConfig>;
+    rateLimit?: Partial<RateLimitConfig>;
+    api?: Partial<ApiConfig>;
+    proxy?: Partial<ProxyConfig>;
+    reddit?: Partial<RedditConfig>;
+    twitch?: Partial<TwitchConfig>;
+    twitter?: Partial<TwitterConfig>;
+    threads?: Partial<ThreadsConfig>;
+    tiktok?: Partial<TiktokConfig>;
+    instagram?: Partial<InstagramConfig>;
     /** Adapters for the registry (default: the example.com DummyAdapter). */
     adapters?: PlatformAdapter[];
     /** Replace the resolver wholesale (e.g. a throwing/degrading fake). */
-    resolver?: Resolver;
+    resolverInstance?: Resolver;
     cache?: Cache;
     rateLimitStore?: RateLimitStore;
     httpClient?: HttpClient;
@@ -58,101 +66,61 @@ export interface TestAppOverrides {
 
 /**
  * Build a fully-routed Hono app for integration tests, wired from a child
- * container so `@singleton` state (breaker maps, rate-limit counters, captured
- * config) never bleeds between tests. Leaves are registered as instances;
- * config-capturing/stateful singletons are re-registered so the child builds
- * fresh ones. Controllers stay `@injectable` and resolve on demand.
+ * container so `@singleton` state (breaker maps, rate-limit counters) never
+ * bleeds between tests. Config slices are defaults-from-empty-env merged with
+ * per-slice overrides; controllers stay `@injectable` and resolve on demand.
  */
 export default function createTestApp(overrides: TestAppOverrides = {}): Hono {
     const c = container.createChildContainer();
 
-    const config: Config = Object.assign(
-        loadConfig({}),
-        overrides.config ?? {},
-    );
-    c.registerInstance(Config, config);
-    // TRANSITIONAL bridge: derive slices from the merged legacy `config` so both
-    // Config-based and slice-based consumers see the same test overrides. Removed
-    // in the cleanup task once TestAppOverrides becomes per-slice.
-    c.registerInstance(
-        AppConfig,
-        Object.assign(new AppConfig(), {
-            port: config.port,
-            publicBaseUrl: config.publicBaseUrl,
-            extraCrawlerUas: config.extraCrawlerUas,
-        }),
-    );
-    c.registerInstance(
-        ResolverConfig,
-        Object.assign(new ResolverConfig(), {
-            resolveTimeoutMs: config.resolveTimeoutMs,
-            cacheTtlSeconds: config.cacheTtlSeconds,
-        }),
-    );
-    c.registerInstance(
-        RateLimitConfig,
-        Object.assign(new RateLimitConfig(), {perMin: config.rateLimitPerMin}),
-    );
-    c.registerInstance(
-        ApiConfig,
-        Object.assign(new ApiConfig(), {
-            keys: config.apiKeys,
-            rateLimitPerMin: config.apiRateLimitPerMin,
-            batchMaxUrls: config.batchMaxUrls,
-        }),
-    );
-    c.registerInstance(
-        ProxyConfig,
-        Object.assign(new ProxyConfig(), {
-            secret: config.proxySecret,
-            hostAllowlist: config.proxyHostAllowlist,
-            maxConcurrent: config.proxyMaxConcurrent,
-            maxBytes: config.proxyMaxBytes,
-            timeoutMs: config.proxyTimeoutMs,
-        }),
-    );
-    c.registerInstance(
-        RedditConfig,
-        Object.assign(new RedditConfig(), {
-            clientId: config.redditClientId,
-            clientSecret: config.redditClientSecret,
-            proxyUrl: config.redditProxyUrl,
-            httpProxy: config.redditHttpProxy,
-        }),
-    );
-    c.registerInstance(
-        TwitchConfig,
-        Object.assign(new TwitchConfig(), {
-            clientId: config.twitchClientId,
-            clientSecret: config.twitchClientSecret,
-            gqlClientId: config.twitchGqlClientId,
-            gqlClipHash: config.twitchGqlClipHash,
-        }),
-    );
-    c.registerInstance(
-        TwitterConfig,
-        Object.assign(new TwitterConfig(), {
-            syndicationFeatures: config.twitterSyndicationFeatures,
-        }),
-    );
-    c.registerInstance(
-        ThreadsConfig,
-        Object.assign(new ThreadsConfig(), config.threads),
-    );
-    c.registerInstance(
-        TiktokConfig,
-        Object.assign(new TiktokConfig(), config.tiktok),
-    );
-    c.registerInstance(
-        InstagramConfig,
-        Object.assign(new InstagramConfig(), config.instagram),
-    );
+    const slice = <T extends object>(base: T, over?: Partial<T>): T =>
+        Object.assign(base, over ?? {});
+
     c.registerInstance(Logger, new Logger({write: () => {}}));
     c.registerInstance(HttpClient, overrides.httpClient ?? new HttpClient());
     c.registerInstance(cacheToken, overrides.cache ?? new MemoryCache());
     c.registerInstance(
         rateLimitStoreToken,
         overrides.rateLimitStore ?? new MemoryRateLimitStore(),
+    );
+
+    c.registerInstance(AppConfig, slice(AppConfig.fromEnv({}), overrides.app));
+    c.registerInstance(
+        ResolverConfig,
+        slice(ResolverConfig.fromEnv({}), overrides.resolver),
+    );
+    c.registerInstance(
+        RateLimitConfig,
+        slice(RateLimitConfig.fromEnv({}), overrides.rateLimit),
+    );
+    c.registerInstance(ApiConfig, slice(ApiConfig.fromEnv({}), overrides.api));
+    c.registerInstance(
+        ProxyConfig,
+        slice(ProxyConfig.fromEnv({}), overrides.proxy),
+    );
+    c.registerInstance(
+        RedditConfig,
+        slice(RedditConfig.fromEnv({}), overrides.reddit),
+    );
+    c.registerInstance(
+        TwitchConfig,
+        slice(TwitchConfig.fromEnv({}), overrides.twitch),
+    );
+    c.registerInstance(
+        TwitterConfig,
+        slice(TwitterConfig.fromEnv({}), overrides.twitter),
+    );
+    c.registerInstance(
+        ThreadsConfig,
+        slice(ThreadsConfig.fromEnv({}), overrides.threads),
+    );
+    c.registerInstance(
+        TiktokConfig,
+        slice(TiktokConfig.fromEnv({}), overrides.tiktok),
+    );
+    c.registerInstance(
+        InstagramConfig,
+        slice(InstagramConfig.fromEnv({}), overrides.instagram),
     );
 
     const clock = new Clock();
@@ -171,9 +139,8 @@ export default function createTestApp(overrides: TestAppOverrides = {}): Hono {
     // These singletons capture per-test config or hold mutable state. Without
     // re-registration the child would reuse a globally-cached instance built
     // for an earlier test, so re-register them to force fresh construction.
-    // Resolver also accepts a caller-supplied fake (throwing/degraded tests).
-    if (overrides.resolver) {
-        c.registerInstance(Resolver, overrides.resolver);
+    if (overrides.resolverInstance) {
+        c.registerInstance(Resolver, overrides.resolverInstance);
     } else {
         c.registerSingleton(Resolver);
     }

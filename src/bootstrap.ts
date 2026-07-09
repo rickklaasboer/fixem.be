@@ -2,7 +2,6 @@ import {Hono} from 'hono';
 import type {DependencyContainer} from 'tsyringe';
 import {container} from '@/container';
 import routes from '@/http/routes';
-import Config, {loadConfig} from '@/config/Config';
 import CoreServiceProvider from '@/providers/CoreServiceProvider';
 import CacheServiceProvider from '@/providers/CacheServiceProvider';
 import RateLimitServiceProvider from '@/providers/RateLimitServiceProvider';
@@ -30,10 +29,6 @@ const PROVIDERS = [
  */
 export default function bootstrap(): Hono {
     const env = process.env as Env;
-
-    // TEMPORARY (removed in the config-migration cleanup): consumers still inject
-    // the flat `Config`; keep it registered until every consumer reads a slice.
-    container.registerInstance(Config, loadConfig(env));
 
     const providers: ServiceProvider[] = PROVIDERS.map(
         (P) => new P(container as DependencyContainer, env),

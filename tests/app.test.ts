@@ -1,7 +1,6 @@
 import {describe, expect, test} from 'bun:test';
 import type {Hono} from 'hono';
 import createTestApp, {type TestAppOverrides} from './support/createTestApp';
-import type Config from '@/config/Config';
 import RedditConfig from '@/config/RedditConfig';
 import TiktokConfig from '@/config/TiktokConfig';
 import HttpClient from '@/services/HttpClient';
@@ -166,7 +165,7 @@ describe('routes', () => {
     });
 
     const API_KEY = 'test-status-key';
-    const apiCfg: Partial<Config> = {apiKeys: [API_KEY]};
+    const apiCfg: TestAppOverrides = {api: {keys: [API_KEY]}};
     const apiGet = (app: Hono, path: string, key: string | null = API_KEY) =>
         app.request(path, {
             headers: {
@@ -177,7 +176,7 @@ describe('routes', () => {
 
     test('GET /api/v1/health reports media JSON for a matched URL', async () => {
         const res = await apiGet(
-            makeApp({config: apiCfg}),
+            makeApp(apiCfg),
             `/api/v1/health?url=${encodeURIComponent('https://example.com/hello')}`,
         );
         expect(res.status).toBe(200);
@@ -190,7 +189,7 @@ describe('routes', () => {
 
     test('GET /api/v1/health reports no-adapter for an unmatched URL', async () => {
         const res = await apiGet(
-            makeApp({config: apiCfg}),
+            makeApp(apiCfg),
             `/api/v1/health?url=${encodeURIComponent('https://unknown-platform.dev/x')}`,
         );
         expect(res.status).toBe(200);
@@ -209,7 +208,7 @@ describe('routes', () => {
             },
         };
         const res = await apiGet(
-            makeApp({config: apiCfg, adapters: [failing]}),
+            makeApp({...apiCfg, adapters: [failing]}),
             `/api/v1/health?url=${encodeURIComponent('https://broken.test/post/1')}`,
         );
         expect(res.status).toBe(200);
@@ -220,13 +219,13 @@ describe('routes', () => {
     });
 
     test('GET /api/v1/health with no url returns liveness', async () => {
-        const res = await apiGet(makeApp({config: apiCfg}), '/api/v1/health');
+        const res = await apiGet(makeApp(apiCfg), '/api/v1/health');
         expect(res.status).toBe(200);
         expect(await res.json()).toEqual({ok: true, redis: true});
     });
 
     test('/api/v1/* requires a valid bearer token', async () => {
-        const app = makeApp({config: apiCfg});
+        const app = makeApp(apiCfg);
         const path = '/api/v1/platforms';
         expect((await apiGet(app, path, null)).status).toBe(401); // missing
         expect((await apiGet(app, path, 'wrong-key')).status).toBe(401); // wrong
@@ -241,7 +240,7 @@ describe('routes', () => {
     });
 
     test('browser requests are rate limited, crawlers exempt', async () => {
-        const app = makeApp({config: {rateLimitPerMin: 2}});
+        const app = makeApp({rateLimit: {perMin: 2}});
         const path = '/https://example.com/hello';
         expect((await get(app, path, BROWSER_UA)).status).toBe(302);
         expect((await get(app, path, BROWSER_UA)).status).toBe(302);
@@ -250,7 +249,7 @@ describe('routes', () => {
     });
 
     test('oembed is rate limited for browsers, crawlers exempt', async () => {
-        const app = makeApp({config: {rateLimitPerMin: 1}});
+        const app = makeApp({rateLimit: {perMin: 1}});
         const path = '/oembed?url=https%3A%2F%2Fexample.com%2Fhello';
         expect((await get(app, path, BROWSER_UA)).status).toBe(200);
         expect((await get(app, path, BROWSER_UA)).status).toBe(429);
@@ -258,7 +257,7 @@ describe('routes', () => {
     });
 
     test('/preview/ is rate limited like a browser', async () => {
-        const app = makeApp({config: {rateLimitPerMin: 1}});
+        const app = makeApp({rateLimit: {perMin: 1}});
         const path = '/preview/https://example.com/hello';
         expect((await get(app, path, BROWSER_UA)).status).toBe(200);
         expect((await get(app, path, BROWSER_UA)).status).toBe(429);
@@ -324,7 +323,7 @@ describe('routes', () => {
                 throw new Error('boom');
             },
         } as unknown as Resolver;
-        const app = makeApp({resolver: throwingResolver});
+        const app = makeApp({resolverInstance: throwingResolver});
         const res = await get(app, '/https://example.com/hello', DISCORD_UA);
         expect(res.status).toBe(302);
         expect(res.headers.get('Location')).toBe('https://example.com/hello');
@@ -390,7 +389,7 @@ test('tiktok URL routes through the full app with a fixture-backed adapter', asy
         new HttpClient(fetchFn),
     );
     const app = createTestApp({
-        config: {proxySecret: 's', publicBaseUrl: 'https://fixem.be'},
+        proxy: {secret: 's'}, app: {publicBaseUrl: 'https://fixem.be'},
         adapters: [adapter],
     });
     const res = await get(
@@ -426,7 +425,7 @@ test('proxied video is rewritten to a signed /v/ URL', async () => {
         }),
     };
     const app = createTestApp({
-        config: {proxySecret: 's', publicBaseUrl: 'https://fixem.be'},
+        proxy: {secret: 's'}, app: {publicBaseUrl: 'https://fixem.be'},
         adapters: [proxAdapter],
     });
     const res = await get(app, '/https://prox.test/1', DISCORD_UA);
@@ -483,7 +482,7 @@ test('proxy-required video on a non-allowlisted host drops to link (not a 403 pl
     };
     const res = await get(
         createTestApp({
-            config: {proxySecret: 's', publicBaseUrl: 'https://fixem.be'},
+            proxy: {secret: 's'}, app: {publicBaseUrl: 'https://fixem.be'},
             adapters: [proxAdapter],
         }),
         '/https://prox.test/1',

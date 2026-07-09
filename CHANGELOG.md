@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.0.0](https://github.com///compare/v1.3.2...v2.0.0) (2026-07-09)
+
+### ⚠ BREAKING CHANGES
+
+* **api:** switch /api auth to Authorization: Bearer against API_KEYS
+
+### Features
+
+* **api:** add /api/v1 resolve/canonical/platforms/health; retire /api/status/adapter ([0c4734b](https://github.com///commit/0c4734b5dc8bbde068847cc48524b8b4afe3dfb5))
+* **api:** add PublicMetaRenderer (proxyHeaders-stripping public JSON mapper) ([c6223db](https://github.com///commit/c6223db0c654aed04ea5abccc9470123ab93fcd9))
+* **api:** add Secrets.hash and key-bucketed ApiRateLimitMiddleware ([7f35da3](https://github.com///commit/7f35da38b5703e863de77d2727ea6ff49366d753))
+* **api:** add static platform capability table for /api/v1/platforms ([5e9edec](https://github.com///commit/5e9edec9afaa63493dbe121c87e17a8259727a77))
+* **api:** ship openapi.yaml, serve it publicly, guard route drift ([b7e948a](https://github.com///commit/b7e948ab552756b844d57b4f0ec13d73156f1654))
+* **api:** switch /api auth to Authorization: Bearer against API_KEYS ([f4b3e0f](https://github.com///commit/f4b3e0f14224b7ba0a22fb1cdead1fdc9726cee6))
+* **config:** add API_KEYS, API_RATE_LIMIT_PER_MIN, BATCH_MAX_URLS ([0ea3025](https://github.com///commit/0ea3025dba8344fe4e4117f789206f8e5a1c2ee7))
+
+### Bug Fixes
+
+* **api:** quote openapi.yaml descriptions with braces; validate YAML parses in the drift-guard test ([6f47e32](https://github.com///commit/6f47e32965c7015f260d8c02df7ea8c06ffa36c4))
+* Cache-warm platform capability list; wrap long lines to match Prettier config ([158e4b4](https://github.com///commit/158e4b4391a186d1de1a81243ef7e7e774239831))
+
 ## [1.3.2](https://github.com///compare/v1.3.1...v1.3.2) (2026-07-08)
 
 ## [1.3.1](https://github.com///compare/v1.3.0...v1.3.1) (2026-07-08)

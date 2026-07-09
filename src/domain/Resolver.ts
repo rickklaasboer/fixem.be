@@ -3,7 +3,7 @@ import AdapterRegistry from '@/domain/AdapterRegistry';
 import Cache from '@/services/cache/Cache';
 import Logger from '@/services/Logger';
 import Clock from '@/services/Clock';
-import Config from '@/config/Config';
+import ResolverConfig from '@/config/ResolverConfig';
 import type EmbedMetadata from '@/domain/EmbedMetadata';
 import type ResolveOutcome from '@/domain/ResolveOutcome';
 
@@ -47,7 +47,7 @@ export default class Resolver {
         private cache: Cache,
         private logger: Logger,
         private clock: Clock,
-        private config: Config,
+        private config: ResolverConfig,
     ) {}
 
     public canonicalFor(

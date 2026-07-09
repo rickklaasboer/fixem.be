@@ -5,7 +5,7 @@ import MemoryCache from '@/services/cache/MemoryCache';
 import Logger from '@/services/Logger';
 import type Cache from '@/services/cache/Cache';
 import type Clock from '@/services/Clock';
-import type Config from '@/config/Config';
+import type ResolverConfig from '@/config/ResolverConfig';
 import type EmbedMetadata from '@/domain/EmbedMetadata';
 import type PlatformAdapter from '@/domain/PlatformAdapter';
 
@@ -55,7 +55,7 @@ function makeResolver(adapter: PlatformAdapter, opts: ResolverOverrides = {}) {
     const config = {
         cacheTtlSeconds: ttlSeconds,
         resolveTimeoutMs: timeoutMs,
-    } as unknown as Config;
+    } as unknown as ResolverConfig;
     const registry = new AdapterRegistry([adapter]);
     return new Resolver(registry, cache, silent, clock, config);
 }

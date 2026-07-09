@@ -1,0 +1,189 @@
+openapi: 3.1.0
+info:
+  title: fixem.be metadata API
+  version: '1.0'
+  description: >
+    Resolve a social-media URL to clean, structured embed metadata.
+    A well-formed URL never 5xxs; the caller branches on `status`.
+servers:
+  - url: https://fixem.be
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/resolve:
+    get:
+      summary: Resolve a single URL to metadata
+      security:
+        - bearerAuth: []
+      parameters:
+        - {name: url, in: query, required: true, schema: {type: string, format: uri}}
+        - {name: media, in: query, required: false, schema: {type: string, enum: [proxied]}}
+      responses:
+        '200':
+          description: A resolve result (branch on `status`).
+          headers:
+            X-RateLimit-Limit: {schema: {type: integer}}
+            X-RateLimit-Remaining: {schema: {type: integer}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ResolveResult'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+    post:
+      summary: Batch resolve (bounded, request-ordered)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [urls]
+              properties:
+                urls: {type: array, items: {type: string, format: uri}, minItems: 1}
+                media: {type: string, enum: [proxied]}
+      responses:
+        '200':
+          description: Per-item results in request order.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items: {$ref: '#/components/schemas/BatchItem'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /api/v1/canonical:
+    get:
+      summary: Canonicalize a URL (no upstream fetch)
+      security:
+        - bearerAuth: []
+      parameters:
+        - {name: url, in: query, required: true, schema: {type: string, format: uri}}
+      responses:
+        '200':
+          description: "Platform + canonical URL, or `{platform: none}`."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  platform: {type: string}
+                  canonicalUrl: {type: string, format: uri}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /api/v1/platforms:
+    get:
+      summary: Supported platforms + capability flags
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Registered platforms with capability flags.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  platforms:
+                    type: array
+                    items: {$ref: '#/components/schemas/PlatformCapability'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /api/v1/health:
+    get:
+      summary: Adapter health (with url) or liveness (without)
+      security:
+        - bearerAuth: []
+      parameters:
+        - {name: url, in: query, required: false, schema: {type: string, format: uri}}
+      responses:
+        '200':
+          description: "Adapter outcome payload, or `{ok, redis}` liveness."
+          content:
+            application/json: {schema: {type: object}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /oembed:
+    get:
+      summary: oEmbed JSON (public, unauthenticated)
+      security: []
+      parameters:
+        - {name: url, in: query, required: true, schema: {type: string, format: uri}}
+      responses:
+        '200': {description: oEmbed 1.0 JSON, content: {application/json: {schema: {type: object}}}}
+        '404': {description: Unknown or unresolvable URL}
+  /openapi.yaml:
+    get:
+      summary: This contract (public, unauthenticated)
+      security: []
+      responses:
+        '200': {description: The OpenAPI document, content: {application/yaml: {schema: {type: string}}}}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  responses:
+    BadRequest:
+      description: Malformed or oversized request.
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Unauthorized:
+      description: Missing or invalid bearer key.
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    RateLimited:
+      description: Rate limit exceeded.
+      headers: {Retry-After: {schema: {type: integer}}}
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+  schemas:
+    Error:
+      type: object
+      properties: {error: {type: string}}
+    Video:
+      type: object
+      required: [url, mimeType, needsProxy]
+      properties:
+        url: {type: string, format: uri, description: Raw upstream URL, always present}
+        width: {type: integer}
+        height: {type: integer}
+        mimeType: {type: string}
+        needsProxy: {type: boolean, description: Upstream is IP/cookie-locked}
+        playableUrl: {type: string, format: uri, description: Signed /v/ URL, only when media=proxied}
+    ResolveResult:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, enum: [ok, degraded, no-adapter]}
+        platform: {type: string}
+        canonicalUrl: {type: string, format: uri}
+        cacheHit: {type: boolean}
+        reason: {type: string}
+        kind: {type: string, enum: [video, image, gallery, link]}
+        title: {type: string}
+        description: {type: string}
+        author: {type: object, properties: {name: {type: string}, url: {type: string}}}
+        siteName: {type: string}
+        themeColor: {type: string}
+        nsfw: {type: boolean}
+        image: {type: object, properties: {url: {type: string}, width: {type: integer}, height: {type: integer}}}
+        video: {$ref: '#/components/schemas/Video'}
+    BatchItem:
+      allOf:
+        - {$ref: '#/components/schemas/ResolveResult'}
+        - type: object
+          properties:
+            url: {type: string}
+            error: {type: string}
+    PlatformCapability:
+      type: object
+      properties:
+        name: {type: string}
+        video: {type: boolean}
+        gallery: {type: boolean}
+        image: {type: boolean}
+        needsCookie: {type: boolean}
+        degradesTo: {type: string, enum: [video, image, gallery, link]}

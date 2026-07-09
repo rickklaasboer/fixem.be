@@ -67,6 +67,54 @@ test('rewrites to a signed /v/ url when allowlisted', async () => {
     expect(out.video && 'proxyHeaders' in out.video).toBe(false);
 });
 
+test('signedUrlFor returns a signed /v/ URL for an allowlisted https host', async () => {
+    const cfg = {
+        proxySecret: 's',
+        proxyHostAllowlist: ['twimg.com'],
+        publicBaseUrl: 'https://fixem.be',
+    } as unknown as Config;
+    const vp = new VideoProxy(cfg, new ProxySigner(), clock, logger);
+    const url = await vp.signedUrlFor(base.video!);
+    expect(url?.startsWith('https://fixem.be/v/')).toBe(true);
+});
+
+test('signedUrlFor returns null when disabled / not allowlisted / no headers', async () => {
+    const signer = new ProxySigner();
+    const disabled = {
+        proxySecret: '',
+        proxyHostAllowlist: ['twimg.com'],
+        publicBaseUrl: 'https://fixem.be',
+    } as unknown as Config;
+    expect(
+        await new VideoProxy(disabled, signer, clock, logger).signedUrlFor(
+            base.video!,
+        ),
+    ).toBeNull();
+
+    const notAllowed = {
+        proxySecret: 's',
+        proxyHostAllowlist: ['example.com'],
+        publicBaseUrl: 'https://fixem.be',
+    } as unknown as Config;
+    expect(
+        await new VideoProxy(notAllowed, signer, clock, logger).signedUrlFor(
+            base.video!,
+        ),
+    ).toBeNull();
+
+    const enabled = {
+        proxySecret: 's',
+        proxyHostAllowlist: ['twimg.com'],
+        publicBaseUrl: 'https://fixem.be',
+    } as unknown as Config;
+    expect(
+        await new VideoProxy(enabled, signer, clock, logger).signedUrlFor({
+            url: 'https://video.twimg.com/x.mp4',
+            mimeType: 'video/mp4',
+        }),
+    ).toBeNull(); // no proxyHeaders → nothing to sign
+});
+
 test('passes through metadata with no proxyHeaders unchanged', async () => {
     const cfg = {
         proxySecret: 's',

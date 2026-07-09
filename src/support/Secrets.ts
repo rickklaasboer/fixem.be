@@ -22,4 +22,15 @@ export default class Secrets {
         for (let i = 0; i < ha.length; i++) diff |= ha[i]! ^ hb[i]!;
         return diff === 0;
     }
+
+    /**
+     * Hex SHA-256 of the input — a stable, non-reversible bucket id for a
+     * secret (e.g. rate-limiting on an API key without storing it raw).
+     */
+    public static async hash(s: string): Promise<string> {
+        const bytes = await Secrets.sha256(s);
+        let hex = '';
+        for (const b of bytes) hex += b.toString(16).padStart(2, '0');
+        return hex;
+    }
 }

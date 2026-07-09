@@ -17,6 +17,10 @@ export default class Config {
     public readonly rateLimitPerMin!: number;
     public readonly publicBaseUrl!: string;
     public readonly extraCrawlerUas!: string[];
+    // Public API v1 surface.
+    public readonly apiKeys!: string[];
+    public readonly apiRateLimitPerMin!: number;
+    public readonly batchMaxUrls!: number;
     public readonly twitchClientId?: string;
     public readonly twitchClientSecret?: string;
     public readonly twitchGqlClientId!: string;
@@ -34,8 +38,6 @@ export default class Config {
     public readonly threads!: ThreadsConfig;
     public readonly tiktok!: TiktokConfig;
     public readonly instagram!: InstagramConfig;
-    // Auth for the /api/* surface (e.g. /api/status/adapter). Empty = /api closed.
-    public readonly statusApiKey!: string;
 }
 
 export const DEFAULT_PROXY_ALLOWLIST = [
@@ -83,6 +85,14 @@ export function loadConfig(
             .split(',')
             .map((s) => s.trim().toLowerCase())
             .filter(Boolean),
+        // Comma-separated set of valid bearer keys for /api/v1/*; empty = closed.
+        // Same parse shape as proxyHostAllowlist (trim, drop empties).
+        apiKeys: (env.API_KEYS ?? '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+        apiRateLimitPerMin: intMin(env.API_RATE_LIMIT_PER_MIN, 60, 1),
+        batchMaxUrls: intMin(env.BATCH_MAX_URLS, 20, 1),
         twitchClientId: env.TWITCH_CLIENT_ID,
         twitchClientSecret: env.TWITCH_CLIENT_SECRET,
         // `||` (not `??`): a copied .env.example leaves these as "", which must
@@ -141,8 +151,5 @@ export function loadConfig(
             // Opt-in snapsave.app fallback when our own fetch is login-walled.
             snapsave: env.INSTAGRAM_SNAPSAVE === 'true',
         },
-        // Bearer secret for the /api/* surface. Unset/blank keeps /api closed
-        // (404) so the status endpoint is never open unauthenticated.
-        statusApiKey: env.STATUS_API_KEY ?? '',
     });
 }

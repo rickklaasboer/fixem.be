@@ -2,11 +2,11 @@ import {describe, expect, test} from 'bun:test';
 import {Hono} from 'hono';
 import ApiRateLimitMiddleware from '@/http/middleware/ApiRateLimitMiddleware';
 import MemoryRateLimitStore from '@/services/rate-limit/MemoryRateLimitStore';
-import type Config from '@/config/Config';
+import type ApiConfig from '@/config/ApiConfig';
 import type Clock from '@/services/Clock';
 
 function buildApp(perMin: number) {
-    const config = {apiRateLimitPerMin: perMin} as unknown as Config;
+    const config = {rateLimitPerMin: perMin} as unknown as ApiConfig;
     const clock = {now: () => 1_000} as Clock;
     const mw = new ApiRateLimitMiddleware(
         config,

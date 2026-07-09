@@ -1,6 +1,6 @@
 import {describe, expect, test} from 'bun:test';
 import TwitterAdapter, {syndicationToken} from '@/adapters/TwitterAdapter';
-import Config from '@/config/Config';
+import TwitterConfig from '@/config/TwitterConfig';
 import {SYNDICATION_FEATURES} from '@/config/defaults';
 import HttpClient, {type FetchFn} from '@/services/HttpClient';
 import photoTweet from './fixtures/twitter/photo-tweet.json';
@@ -18,8 +18,8 @@ function fakeFetch(body: unknown, requested: string[] = []): FetchFn {
 function makeAdapter(fetchFn: FetchFn, features?: string): TwitterAdapter {
     return new TwitterAdapter(
         {
-            twitterSyndicationFeatures: features ?? SYNDICATION_FEATURES,
-        } as unknown as Config,
+            syndicationFeatures: features ?? SYNDICATION_FEATURES,
+        } as unknown as TwitterConfig,
         new HttpClient(fetchFn),
     );
 }

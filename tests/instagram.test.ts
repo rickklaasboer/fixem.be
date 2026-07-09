@@ -1,7 +1,7 @@
 import {describe, expect, test} from 'bun:test';
 import InstagramAdapter from '@/adapters/InstagramAdapter';
-import {INSTAGRAM_DEFAULTS, type InstagramConfig} from '@/config/defaults';
-import Config from '@/config/Config';
+import {INSTAGRAM_DEFAULTS} from '@/config/defaults';
+import InstagramConfig from '@/config/InstagramConfig';
 import HttpClient, {CHROME_UA} from '@/services/HttpClient';
 import Snapsave from '@/services/Snapsave';
 import type {FetchFn} from '@/services/HttpClient';
@@ -14,10 +14,11 @@ import videoFixture from './fixtures/instagram/graphql-video.json';
 // GraphQL/mobile calls and the snapsave.app fallback.
 function createInstagramAdapter(
     fetchFn: FetchFn = fetch,
-    igConfig: InstagramConfig = INSTAGRAM_DEFAULTS,
+    igConfig: Partial<InstagramConfig> = {},
 ): InstagramAdapter {
+    const config = Object.assign(InstagramConfig.fromEnv({}), igConfig);
     return new InstagramAdapter(
-        {instagram: igConfig} as unknown as Config,
+        config,
         new HttpClient(fetchFn),
         new Snapsave(new HttpClient(fetchFn)),
     );

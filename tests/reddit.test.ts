@@ -1,6 +1,6 @@
 import {describe, expect, test} from 'bun:test';
 import RedditAdapter from '@/adapters/RedditAdapter';
-import Config from '@/config/Config';
+import RedditConfig from '@/config/RedditConfig';
 import HttpClient from '@/services/HttpClient';
 import type {FetchFn} from '@/services/HttpClient';
 import {CHROME_UA} from '@/services/HttpClient';
@@ -10,10 +10,10 @@ import galleryPost from './fixtures/reddit/gallery-post.json';
 import crosspost from './fixtures/reddit/crosspost.json';
 
 const CREDS_CONFIG = {
-    redditClientId: 'id',
-    redditClientSecret: 'secret',
-} as unknown as Config;
-const NO_CREDS_CONFIG = {} as unknown as Config;
+    clientId: 'id',
+    clientSecret: 'secret',
+} as unknown as RedditConfig;
+const NO_CREDS_CONFIG = {} as unknown as RedditConfig;
 
 function envelope(postData: object) {
     return [
@@ -242,9 +242,9 @@ describe('reddit adapter', () => {
         }) as unknown as FetchFn;
         const ad = new RedditAdapter(
             {
-                redditClientId: 'id',
-                redditClientSecret: 'bad',
-            } as unknown as Config,
+                clientId: 'id',
+                clientSecret: 'bad',
+            } as unknown as RedditConfig,
             new HttpClient(fetchFn),
         );
         await expect(
@@ -410,8 +410,8 @@ describe('reddit adapter', () => {
         }) as unknown as FetchFn;
         const ad = new RedditAdapter(
             {
-                redditProxyUrl: 'https://proxy.example/fetch?u=',
-            } as unknown as Config,
+                proxyUrl: 'https://proxy.example/fetch?u=',
+            } as unknown as RedditConfig,
             new HttpClient(fetchFn),
         );
         const m = await ad.resolve(
@@ -445,8 +445,8 @@ describe('reddit adapter', () => {
         }) as unknown as FetchFn;
         const ad = new RedditAdapter(
             {
-                redditProxyUrl: 'https://proxy.example/fetch?u=',
-            } as unknown as Config,
+                proxyUrl: 'https://proxy.example/fetch?u=',
+            } as unknown as RedditConfig,
             new HttpClient(fetchFn),
         );
         await ad.resolve(new URL('https://www.reddit.com/r/pics/s/AbCdEf123'));
@@ -478,8 +478,8 @@ describe('reddit adapter', () => {
         }) as unknown as FetchFn;
         const ad = new RedditAdapter(
             {
-                redditHttpProxy: 'http://user:pass@gw.dataimpulse.com:823',
-            } as unknown as Config,
+                httpProxy: 'http://user:pass@gw.dataimpulse.com:823',
+            } as unknown as RedditConfig,
             new HttpClient(fetchFn),
         );
         await ad.resolve(new URL('https://www.reddit.com/r/pics/s/AbCdEf123'));
@@ -506,10 +506,10 @@ describe('reddit adapter', () => {
         }) as unknown as FetchFn;
         const ad = new RedditAdapter(
             {
-                redditClientId: 'id',
-                redditClientSecret: 'secret',
-                redditHttpProxy: 'http://user:pass@gw.dataimpulse.com:823',
-            } as unknown as Config,
+                clientId: 'id',
+                clientSecret: 'secret',
+                httpProxy: 'http://user:pass@gw.dataimpulse.com:823',
+            } as unknown as RedditConfig,
             new HttpClient(fetchFn),
         );
         await ad.resolve(

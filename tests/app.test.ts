@@ -1,8 +1,9 @@
 import {describe, expect, test} from 'bun:test';
 import type {Hono} from 'hono';
 import createTestApp, {type TestAppOverrides} from './support/createTestApp';
-import {loadConfig} from '@/config/Config';
 import type Config from '@/config/Config';
+import RedditConfig from '@/config/RedditConfig';
+import TiktokConfig from '@/config/TiktokConfig';
 import HttpClient from '@/services/HttpClient';
 import type Resolver from '@/domain/Resolver';
 import type PlatformAdapter from '@/domain/PlatformAdapter';
@@ -345,7 +346,10 @@ test('reddit URL routes through app with fixture-backed adapter', async () => {
         return new Response(JSON.stringify(imagePost));
     }) as unknown as typeof fetch;
     const adapter = new RedditAdapter(
-        loadConfig({REDDIT_CLIENT_ID: 'id', REDDIT_CLIENT_SECRET: 'sec'}),
+        RedditConfig.fromEnv({
+            REDDIT_CLIENT_ID: 'id',
+            REDDIT_CLIENT_SECRET: 'sec',
+        }),
         new HttpClient(fetchFn),
     );
     const app = createTestApp({adapters: [adapter]});
@@ -381,7 +385,10 @@ test('tiktok URL routes through the full app with a fixture-backed adapter', asy
         `</body></html>`;
     const fetchFn = (async () =>
         new Response(page, {status: 200})) as unknown as typeof fetch;
-    const adapter = new TiktokAdapter(loadConfig({}), new HttpClient(fetchFn));
+    const adapter = new TiktokAdapter(
+        TiktokConfig.fromEnv({}),
+        new HttpClient(fetchFn),
+    );
     const app = createTestApp({
         config: {proxySecret: 's', publicBaseUrl: 'https://fixem.be'},
         adapters: [adapter],

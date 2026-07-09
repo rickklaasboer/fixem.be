@@ -1,6 +1,6 @@
 import {injectable} from 'tsyringe';
 import BaseAdapter from '@/adapters/BaseAdapter';
-import Config from '@/config/Config';
+import ThreadsConfig from '@/config/ThreadsConfig';
 import HttpClient, {FIREFOX_UA} from '@/services/HttpClient';
 import Text from '@/support/Text';
 import type EmbedMetadata from '@/domain/EmbedMetadata';
@@ -123,7 +123,7 @@ export default class ThreadsAdapter extends BaseAdapter {
     public name = 'threads';
 
     constructor(
-        private config: Config,
+        private config: ThreadsConfig,
         private http: HttpClient,
     ) {
         super();
@@ -206,7 +206,7 @@ export default class ThreadsAdapter extends BaseAdapter {
         pathname: string,
         signal?: AbortSignal,
     ): Promise<string | undefined> {
-        const cfg = this.config.threads;
+        const cfg = this.config;
         const res = await this.http.fetch(ROUTE_URL, {
             method: 'POST',
             headers: {
@@ -250,7 +250,7 @@ export default class ThreadsAdapter extends BaseAdapter {
         postId: string,
         signal?: AbortSignal,
     ): Promise<ThreadsPost | undefined> {
-        const cfg = this.config.threads;
+        const cfg = this.config;
         const res = await this.http.fetch(GRAPHQL_URL, {
             method: 'POST',
             headers: {

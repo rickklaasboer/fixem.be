@@ -61,6 +61,20 @@ endpoints:
       alerts:
           - type: discord
 
+    - name: public-docs
+      group: liveness
+      # docs.fixem.be — static Starlight site (separate compose stack, its own
+      # nginx on 127.0.0.1:8081). Monitored over the full public path so this
+      # also validates the reverse proxy vhost and TLS. /healthz returns "ok".
+      url: 'https://docs.fixem.be/healthz'
+      interval: 1m
+      conditions:
+          - '[STATUS] == 200'
+          - '[BODY] == pat(ok*)'
+          - '[CERTIFICATE_EXPIRATION] > 240h'
+      alerts:
+          - type: discord
+
     # ---------------------------------------------------------------------
     # Adapters — genuine end-to-end resolve via /api/v1/health?url=<post>.
     # Authenticated: each sends Authorization: Bearer ${MONITOR_API_KEY}.

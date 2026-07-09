@@ -59,7 +59,9 @@ GET /https://example.com/hello
 The core invariant is that a well-formed wrapped URL never produces a `500`. If
 an adapter throws, times out, or trips its circuit breaker, the request degrades
 to a minimal embed or a redirect. If Redis is down, resolution simply runs
-cache-less. See `src/app.ts` and `src/resolver.ts` for the exact logic.
+cache-less. The catch-all lives in `src/http/controllers/EmbedController.ts` and
+the resolve / cache / circuit-breaker logic in `src/domain/Resolver.ts` (both
+wired up by `src/bootstrap.ts`).
 
 Other routes:
 
@@ -67,6 +69,9 @@ Other routes:
 - `GET /healthz` — liveness probe, returns `{"ok":true,"redis":<bool>}`.
 - `GET /oembed?url=<canonical>` — oEmbed JSON endpoint referenced by the embed
   HTML's discovery link.
+- `GET /openapi.yaml` — the public API contract (see [Public API](#public-api)).
+- `GET /api/v1/*` — versioned JSON metadata API (see [Public API](#public-api)).
+- `GET /v/:token` — signed media proxy (see [Video proxy](#video-proxy)).
 
 ---
 
@@ -77,7 +82,7 @@ it the service runs cache-less and with rate limiting disabled (see
 [Configuration](#configuration)).
 
 ```bash
-bun install          # install dependencies (hono only, at runtime)
+bun install          # install dependencies (hono, tsyringe, reflect-metadata)
 bun run dev          # start on http://localhost:3000 with --watch
 bun test             # run the full test suite
 ```
@@ -145,8 +150,8 @@ merge to `main` (see the CI pipeline in `.github/workflows/`).
 ## Configuration
 
 All configuration is via environment variables. Copy `.env.example` to `.env`
-and edit as needed; every value has a sane default (see `src/lib/config.ts`), so
-an empty `.env` still runs a working — if platform-limited — service.
+and edit as needed; every value has a sane default (see `src/config/Config.ts`),
+so an empty `.env` still runs a working — if platform-limited — service.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -160,9 +165,24 @@ an empty `.env` still runs a working — if platform-limited — service.
 | `PROXY_SECRET` | *(empty)* | HMAC key that signs `/v/` media-proxy URLs. **Set it to a random string to enable inline video** for TikTok/Threads/Instagram; blank disables the proxy and those platforms degrade to a thumbnail or link. See [Video proxy](#video-proxy). |
 | `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` | *(empty)* | Twitch app credentials ([register an app](https://dev.twitch.tv/console)). Both are required to enable Twitch clips; without them the adapter is disabled at startup and Twitch links fall through. |
 | `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | *(empty)* | Optional Reddit OAuth credentials. Without them the adapter scrapes old.reddit.com HTML (video → poster image only); with them it uses the OAuth API for full data incl. muxed video. Self-serve keys are approval-gated since 2025. |
+| `REDDIT_PROXY_URL` | *(empty)* | Optional offload prefix for the anonymous old.reddit scrape (Reddit `403`-blocks many datacenter IP ranges); the target URL is appended (URL-encoded). Same scheme as `INSTAGRAM_PROXY_URL`. Never used on the OAuth path. |
+| `REDDIT_HTTP_PROXY` | *(empty)* | Alternative offload: a standard HTTP `CONNECT` proxy (`http://user:pass@host:port`, e.g. a per-GB residential provider), applied via Bun's `fetch` `proxy` option on the same anonymous fetches. Never used on the OAuth path. |
 | `INSTAGRAM_PROXY_URL` | *(empty)* | Optional residential-proxy offload prefix; the target URL is appended (URL-encoded). Instagram is usually login-walled from datacenter IPs, so a direct fetch (blank) typically fails. |
 | `INSTAGRAM_COOKIE` | *(empty)* | Optional logged-in session cookie (use a **burner** — IG bans scraping accounts) to get past the login wall. Minimum `sessionid=…` (add `csrftoken`/`ds_user_id` for fewer challenges). A full account credential: never logged, never placed in `/v/` tokens, gitignored. Expect an expiry/ban rotation treadmill. |
 | `INSTAGRAM_SNAPSAVE` | `false` | Opt-in last-resort fallback (`"true"` to enable): when our own fetch is login-walled, resolve via snapsave.app. Best-effort and **fragile** — it leans on third-party services and may break without notice. |
+
+### Public API & monitoring
+
+These gate and tune the `/api/v1/*` JSON API and the optional Gatus monitor
+(see [Public API](#public-api) and [Status monitoring](#status-monitoring)).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `API_KEYS` | *(empty)* | Comma-separated bearer keys for `/api/v1/*` (`openssl rand -hex 32` each). Callers send `Authorization: Bearer <key>`; buckets are per key. **Blank closes the whole namespace with a `404`** — it is never open unauthenticated. |
+| `API_RATE_LIMIT_PER_MIN` | `60` | Per-key requests/minute for `/api/v1/*` (distinct from the browser-facing `RATE_LIMIT_PER_MIN`). Responses carry `X-RateLimit-*` headers. |
+| `BATCH_MAX_URLS` | `20` | Max URLs accepted by `POST /api/v1/resolve`. |
+| `MONITOR_API_KEY` | *(empty)* | The single bearer key the Gatus monitor presents on its health checks. Must be one of the keys listed in `API_KEYS`. |
+| `GATUS_DISCORD_WEBHOOK_URL` | *(empty)* | Discord webhook Gatus posts to on adapter failure/recovery. Blank = dashboard only, no alerts. |
 
 <details>
 <summary><strong>Advanced &amp; version-pinned variables</strong> — proxy tuning and platform web-client constants you shouldn't normally need to touch</summary>
@@ -182,7 +202,7 @@ lives next to its adapter in `src/adapters/`.
 | `TWITCH_GQL_CLIENT_ID` / `TWITCH_GQL_CLIP_HASH` | *(pinned)* | Twitch's public web client ID and clip persisted-query hash, used for the clip video (GraphQL) call. |
 | `TWITTER_SYNDICATION_FEATURES` | *(pinned)* | Semicolon-joined feature flags sent to the X/Twitter syndication endpoint. |
 | `THREADS_LSD` / `THREADS_DOC_ID` / `THREADS_APP_ID` / `THREADS_FRIENDLY_NAME` | *(pinned)* | Threads public web-client constants. |
-| `TIKTOK_MOBILE_API_HOST` / `TIKTOK_IID` / `TIKTOK_DEVICE_ID` | *(pinned)* | TikTok public web-client constants. |
+| `TIKTOK_REHYDRATION_SCRIPT_ID` / `TIKTOK_MOBILE_API_HOST` / `TIKTOK_IID` / `TIKTOK_DEVICE_ID` | *(pinned)* | TikTok public web-client constants. |
 | `INSTAGRAM_DOC_ID` / `INSTAGRAM_APP_ID` / `INSTAGRAM_FRIENDLY_NAME` | *(pinned)* | Instagram public web-client constants. |
 
 </details>
@@ -206,38 +226,48 @@ up. `GET /healthz` reports the live connection state in its `redis` field.
 
 ## Adding an adapter
 
-Each platform is a `PlatformAdapter` (see `src/adapters/types.ts`):
+Each platform is a `PlatformAdapter` (`src/domain/PlatformAdapter.ts`):
 
 ```ts
-export interface PlatformAdapter {
-  name: string;                       // e.g. "reddit"
-  match(url: URL): boolean;           // does this adapter handle the URL?
-  canonicalize(url: URL): string;     // stable cache key / canonical URL
-  resolve(url: URL): Promise<EmbedMetadata>;  // fetch + parse metadata
+export default interface PlatformAdapter {
+  name: string;                      // e.g. "reddit"
+  match(url: URL): boolean;          // does this adapter handle the URL?
+  canonicalize(url: URL): string;    // stable cache key / canonical URL
+  resolve(url: URL, signal?: AbortSignal): Promise<EmbedMetadata>;  // fetch + parse
 }
 ```
 
+Adapters are `@injectable` classes wired by the `tsyringe` DI container. They
+extend `BaseAdapter` and receive their dependencies — an `HttpClient`, plus
+`Config` where needed — through the constructor. Injecting `HttpClient` (rather
+than calling the global `fetch`) is what makes an adapter testable against
+recorded fixtures with no network.
+
 To add one:
 
-1. **Implement the adapter** in `src/adapters/<name>.ts`. Export a factory (e.g.
-   `createFooAdapter(fetchFn?: FetchFn): PlatformAdapter`) that takes an
-   **injected `fetchFn`** defaulting to the global `fetch`. Injecting `fetch`
-   is what makes the adapter testable against recorded fixtures. Return an
-   `EmbedMetadata` object from `resolve`; throw on non-2xx or unparseable
-   responses so the resolver can degrade cleanly.
-2. **Record a trimmed fixture** into `tests/fixtures/<name>/`. Capture a real
-   upstream response, then trim it down to only the fields your parser reads
-   (plus a little realistic noise). Keep fixtures small and committed.
-3. **Test against the fixtures** in `tests/<name>.test.ts` by passing a stub
-   `fetchFn` that returns the fixture bodies. Assert the resulting
-   `EmbedMetadata` (kind, title, image/video, author, canonical URL, nsfw, …).
-   No network access in tests.
-4. **Register it** in `src/index.ts` by adding the factory to the
-   `AdapterRegistry` list, e.g.
-   `new AdapterRegistry([createDummyAdapter(), createFooAdapter()])`.
-   The registry picks the first adapter whose `match()` returns `true`.
+1. **Implement the adapter** in `src/adapters/<Name>Adapter.ts` (PascalCase,
+   named for the class it `export default`s). Extend `BaseAdapter`, mark it
+   `@injectable`, and inject `HttpClient` in the constructor. Return an
+   `EmbedMetadata` from `resolve`, and **throw** on a non-2xx or unparseable
+   response so the resolver can degrade cleanly. For reachable-but-refused
+   content (login walls, deleted posts) return `this.linkCard({…})` instead of
+   throwing — that renders an informative link-only embed rather than a failure.
+2. **Match on exact hostname.** `match()` compares `url.hostname` against a `Set`
+   of exact hosts — never a substring check (that would be an SSRF / spoofing
+   hole).
+3. **Record a trimmed fixture** into `tests/fixtures/<name>/`. Capture a real
+   upstream response, then trim it to only the fields your parser reads. Keep
+   fixtures small and committed.
+4. **Test against the fixtures** in `tests/<Name>Adapter.test.ts` by constructing
+   the adapter with a fake `HttpClient`
+   (`new HttpClient(mockFetch as unknown as FetchFn)`) that returns the fixture
+   bodies. Assert the resulting `EmbedMetadata` (kind, title, image/video,
+   author, canonical URL, nsfw, …). No network access in tests.
+5. **Register it** in `src/bootstrap.ts` by adding `app(<Name>Adapter)` to the
+   ordered `adapters` array. `AdapterRegistry` returns the first adapter whose
+   `match()` returns `true`, so array order is behavioural.
 
-The `dummy` adapter (`src/adapters/dummy.ts`) is a minimal, network-free
+`DummyAdapter` (`src/adapters/DummyAdapter.ts`) is a minimal, network-free
 reference implementation.
 
 ---

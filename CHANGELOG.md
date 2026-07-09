@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.1.0](https://github.com///compare/v2.0.1...v2.1.0) (2026-07-09)
+
+### Features
+
+* monitor docs.fixem.be liveness in gatus ([efada79](https://github.com///commit/efada7964a539155f548135351abc5ba44110cc5))
+
 ## [2.0.1](https://github.com///compare/v2.0.0...v2.0.1) (2026-07-09)
 
 ## [2.0.0](https://github.com///compare/v1.3.2...v2.0.0) (2026-07-09)

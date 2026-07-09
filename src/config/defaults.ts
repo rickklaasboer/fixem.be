@@ -94,3 +94,19 @@ export const INSTAGRAM_DEFAULTS: InstagramConfig = {
     appId: '936619743392459',
     friendlyName: 'PolarisPostActionLoadPostQueryQuery',
 };
+
+// Default CDN host allowlist for the /v/ proxy (research: platform media CDNs).
+// Overridable via PROXY_HOST_ALLOWLIST. Entries are lowercase suffix matches.
+export const DEFAULT_PROXY_ALLOWLIST = [
+    'cdninstagram.com',
+    'fbcdn.net',
+    'tiktokcdn.com',
+    'tiktokcdn-us.com',
+    'tiktokcdn-eu.com',
+    'tiktokv.com',
+    'tiktokv.eu',
+    'tiktok.com',
+    'muscdn.com',
+    'byteoversea.com',
+    'video.twimg.com',
+];

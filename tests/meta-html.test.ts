@@ -49,6 +49,44 @@ describe('renderMetaHtml', () => {
         expect(html).not.toContain('Hello <world>');
     });
 
+    test('escapes a breakout payload across every interpolated context', () => {
+        // Regression guard: the wrapped target (title/originalUrl/siteName/author)
+        // is attacker-influenced. A `"><script>` breakout must be neutralised in
+        // the <title>, og:url, the meta-refresh content attr, the oembed link
+        // title, and the redirect <a href> — every place these values land.
+        const payload = '"><script>alert(1)</script>';
+        const meta: EmbedMetadata = {
+            kind: 'link',
+            title: payload,
+            siteName: payload,
+            author: {name: payload},
+            originalUrl: 'https://e.com/"><x',
+        };
+        const html = r.render(meta, {
+            oembedUrl: 'https://fixem.be/oembed?url="><x',
+        });
+        // No live script and no attribute breakout anywhere in the document.
+        expect(html).not.toContain('<script>');
+        expect(html).not.toContain('"><');
+        // Escaped forms land in each named context.
+        expect(html).toContain(
+            '<title>&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;</title>',
+        );
+        expect(html).toContain(
+            '<meta property="og:url" content="https://e.com/&quot;&gt;&lt;x">',
+        );
+        expect(html).toContain(
+            '<meta http-equiv="refresh" content="0;url=https://e.com/&quot;&gt;&lt;x">',
+        );
+        expect(html).toContain(
+            'title="&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"',
+        );
+        expect(html).toContain('<a href="https://e.com/&quot;&gt;&lt;x">');
+        expect(html).toContain(
+            'href="https://fixem.be/oembed?url=&quot;&gt;&lt;x"',
+        );
+    });
+
     test('video post uses player card and og:video tags', () => {
         const meta: EmbedMetadata = {
             ...base,

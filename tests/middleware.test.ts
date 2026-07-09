@@ -40,6 +40,21 @@ describe('ApiAuthMiddleware', () => {
         expect(res.status).toBe(200);
         expect(await res.json()).toEqual({ok: true});
     });
+
+    test('accepts a case-insensitive scheme and extra whitespace (RFC 6750)', async () => {
+        const app = build(['secret']);
+        for (const h of [
+            'Bearer secret',
+            'bearer secret',
+            'BEARER secret',
+            'Bearer   secret',
+        ]) {
+            const res = await app.request('/api/thing', {
+                headers: {Authorization: h},
+            });
+            expect(res.status).toBe(200);
+        }
+    });
 });
 
 describe('RateLimitMiddleware', () => {

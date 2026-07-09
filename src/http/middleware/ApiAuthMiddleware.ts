@@ -17,8 +17,7 @@ export default class ApiAuthMiddleware implements Middleware {
         if (this.config.apiKeys.length === 0) {
             return c.json({error: 'not found'}, 404);
         }
-        const auth = c.req.header('Authorization') ?? '';
-        const provided = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+        const provided = Secrets.bearer(c.req.header('Authorization'));
         for (const key of this.config.apiKeys) {
             if (await Secrets.match(provided, key)) {
                 await next();

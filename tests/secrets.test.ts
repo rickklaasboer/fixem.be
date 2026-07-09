@@ -19,3 +19,18 @@ test('hash returns a stable 64-char hex digest', async () => {
     expect(await Secrets.hash('abc')).toBe(h);
     expect(await Secrets.hash('abd')).not.toBe(h);
 });
+
+test('bearer parses the token case-insensitively and tolerates extra whitespace', () => {
+    expect(Secrets.bearer('Bearer abc')).toBe('abc');
+    expect(Secrets.bearer('bearer abc')).toBe('abc');
+    expect(Secrets.bearer('BEARER abc')).toBe('abc');
+    expect(Secrets.bearer('Bearer    abc')).toBe('abc');
+});
+
+test('bearer returns empty for a missing, empty, or non-bearer header', () => {
+    expect(Secrets.bearer(undefined)).toBe('');
+    expect(Secrets.bearer(null)).toBe('');
+    expect(Secrets.bearer('')).toBe('');
+    expect(Secrets.bearer('Basic abc')).toBe('');
+    expect(Secrets.bearer('Bearer')).toBe('');
+});

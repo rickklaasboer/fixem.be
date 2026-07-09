@@ -138,7 +138,10 @@ export default class Snapsave {
      * POST the Instagram URL to snapsave.app and parse its response (null on
      * any non-ok/transport failure — never throws).
      */
-    public async fetchMedia(canonical: string): Promise<SnapsaveMedia | null> {
+    public async fetchMedia(
+        canonical: string,
+        signal?: AbortSignal,
+    ): Promise<SnapsaveMedia | null> {
         try {
             const res = await this.http.fetch(SNAPSAVE_URL, {
                 method: 'POST',
@@ -149,6 +152,7 @@ export default class Snapsave {
                     'User-Agent': CHROME_UA,
                 },
                 body: `url=${encodeURIComponent(canonical)}`,
+                signal,
             });
             if (!res.ok) return null;
             return Snapsave.parse(await res.text());

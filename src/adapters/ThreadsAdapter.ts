@@ -151,7 +151,7 @@ export default class ThreadsAdapter extends BaseAdapter {
         const pathUser = p.form === 'post' ? p.user : undefined;
 
         const postId = await this.resolvePostId(url.pathname, signal);
-        const post = await this.fetchPost(postId, signal);
+        const post = postId ? await this.fetchPost(postId, signal) : undefined;
 
         if (!post) {
             // Reachable but no data (private/deleted/blocked): an honest text embed
@@ -205,7 +205,7 @@ export default class ThreadsAdapter extends BaseAdapter {
     private async resolvePostId(
         pathname: string,
         signal?: AbortSignal,
-    ): Promise<string> {
+    ): Promise<string | undefined> {
         const cfg = this.config.threads;
         const res = await this.http.fetch(ROUTE_URL, {
             method: 'POST',
@@ -227,7 +227,15 @@ export default class ThreadsAdapter extends BaseAdapter {
         const text = await res.text();
         // Response is prefixed with the `for (;;);` XSS guard — strip it before JSON.
         const body = text.startsWith('for (;;);') ? text.slice(9) : text;
-        const json = JSON.parse(body) as RouteResponse;
+        // Meta bot-blocks the anonymous route call the same way as GraphQL — a 200
+        // text/html challenge instead of JSON. Degrade to the informative card
+        // (postId undefined → resolve() emits it) rather than throwing on the parse.
+        let json: RouteResponse;
+        try {
+            json = JSON.parse(body) as RouteResponse;
+        } catch {
+            return undefined;
+        }
         const result = json.payload?.payloads?.[pathname]?.result;
         const postId =
             result?.exports?.rootView?.props?.post_id ??

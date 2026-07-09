@@ -55,6 +55,22 @@ describe('snapsave decoder', () => {
         expect(media?.mediaUrl).toContain('rapidcdn.app');
     });
 
+    test('fetchMedia forwards the abort signal to the underlying fetch', async () => {
+        // On a resolve timeout the fallback must be cancellable like every other
+        // adapter fetch — otherwise it runs unbounded past the resolver deadline.
+        const controller = new AbortController();
+        let seenSignal: AbortSignal | undefined;
+        const fetchFn = (async (_input: unknown, init?: RequestInit) => {
+            seenSignal = init?.signal ?? undefined;
+            return new Response(blob, {status: 200});
+        }) as unknown as FetchFn;
+        await new Snapsave(new HttpClient(fetchFn)).fetchMedia(
+            'https://www.instagram.com/p/x/',
+            controller.signal,
+        );
+        expect(seenSignal).toBe(controller.signal);
+    });
+
     test('fetchMedia returns null on transport failure (no throw)', async () => {
         const boom = (async () => {
             throw new Error('network down');

@@ -243,7 +243,7 @@ export default class InstagramAdapter extends BaseAdapter {
             // informative degrade. rapidcdn media links are Discord-fetchable directly,
             // so no /v/ proxy and no proxyHeaders.
             if (cfg.snapsave) {
-                const snap = await this.snapsave.fetchMedia(canonical);
+                const snap = await this.snapsave.fetchMedia(canonical, signal);
                 if (snap) {
                     return {
                         kind: snap.kind,

@@ -21,8 +21,7 @@ export default class ApiRateLimitMiddleware implements Middleware {
     ) {}
 
     public handle: MiddlewareHandler = async (c, next) => {
-        const auth = c.req.header('Authorization') ?? '';
-        const key = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+        const key = Secrets.bearer(c.req.header('Authorization'));
         const bucket = `api:${await Secrets.hash(key)}`;
         const limit = this.config.apiRateLimitPerMin;
         const hits = await this.store.hit(bucket, 60_000, this.clock.now());

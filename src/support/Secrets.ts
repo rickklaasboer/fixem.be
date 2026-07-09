@@ -33,4 +33,16 @@ export default class Secrets {
         for (const b of bytes) hex += b.toString(16).padStart(2, '0');
         return hex;
     }
+
+    /**
+     * Extract the token from an `Authorization` header. Per RFC 6750 the scheme
+     * is case-insensitive and one-or-more spaces may separate it from the token,
+     * so parse leniently — a brittle `startsWith('Bearer ')` rejects legal headers.
+     * Returns '' for a missing/non-bearer header. Shared by the auth + rate-limit
+     * middleware so they agree on exactly which token a request carries.
+     */
+    public static bearer(header: string | null | undefined): string {
+        const m = header?.match(/^Bearer\s+(.*)$/i);
+        return m ? m[1]!.trim() : '';
+    }
 }

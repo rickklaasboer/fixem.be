@@ -1,4 +1,4 @@
-import {injectable} from 'tsyringe';
+import {singleton} from 'tsyringe';
 import type {Context} from 'hono';
 
 /**
@@ -7,11 +7,19 @@ import type {Context} from 'hono';
  * tier as /oembed and /healthz — so the external docs site and any consumer
  * wanting codegen fetch one canonical document.
  */
-@injectable()
+@singleton()
 export default class OpenApiController {
+    private cached: string | null = null;
+
     public async spec(c: Context): Promise<Response> {
-        const text = await Bun.file(`${process.cwd()}/openapi.yaml`).text();
-        return c.body(text, 200, {
+        // The spec is committed & immutable at runtime — read it once, not per
+        // request (this route is public, unauthenticated, and un-rate-limited).
+        if (this.cached === null) {
+            this.cached = await Bun.file(
+                `${process.cwd()}/openapi.yaml`,
+            ).text();
+        }
+        return c.body(this.cached, 200, {
             'Content-Type': 'application/yaml; charset=utf-8',
         });
     }

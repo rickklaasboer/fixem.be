@@ -326,6 +326,26 @@ describe('threads adapter', () => {
         );
     });
 
+    test('route call HTML challenge (Meta bot-block) -> informative link embed (no throw)', async () => {
+        // Symmetric to the GraphQL challenge above: Meta can answer the bulk-route
+        // call with a 200 text/html challenge instead of JSON too. The route parse
+        // must degrade to the informative card rather than throwing on JSON.parse
+        // (a throw would give a bare URL-as-title redirect).
+        const htmlChallenge = (async () =>
+            new Response('<!DOCTYPE html><html>login</html>', {
+                status: 200,
+                headers: {'content-type': 'text/html'},
+            })) as unknown as FetchFn;
+        const ad = createThreadsAdapter(htmlChallenge);
+        const m = await ad.resolve(POST_URL);
+        expect(m.kind).toBe('link');
+        expect(m.title).toBe('@johndoe');
+        expect(m.description).toContain("couldn't be loaded");
+        expect(m.originalUrl).toBe(
+            'https://www.threads.com/@johndoe/post/ABC123',
+        );
+    });
+
     test('missing post_id from route call throws', async () => {
         const ad = createThreadsAdapter(
             fakeFetch({route: {payload: {payloads: {}}}}),

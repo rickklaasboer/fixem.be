@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.1.1](https://github.com///compare/v2.1.0...v2.1.1) (2026-07-09)
+
+### Bug Fixes
+
+* harden auth parsing, threads/snapsave abort handling, and cache openapi spec ([e1f8069](https://github.com///commit/e1f80694f2875288d6b20b48a94ec6f735a0e13d))
+
 ## [2.1.0](https://github.com///compare/v2.0.1...v2.1.0) (2026-07-09)
 
 ### Features

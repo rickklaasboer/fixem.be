@@ -20,6 +20,17 @@ import ApiAuthMiddleware from '@/http/middleware/ApiAuthMiddleware';
 import ApiRateLimitMiddleware from '@/http/middleware/ApiRateLimitMiddleware';
 import RateLimitMiddleware from '@/http/middleware/RateLimitMiddleware';
 import DummyAdapter from '@/adapters/DummyAdapter';
+import AppConfig from '@/config/AppConfig';
+import ResolverConfig from '@/config/ResolverConfig';
+import RateLimitConfig from '@/config/RateLimitConfig';
+import ApiConfig from '@/config/ApiConfig';
+import ProxyConfig from '@/config/ProxyConfig';
+import RedditConfig from '@/config/RedditConfig';
+import TwitchConfig from '@/config/TwitchConfig';
+import TwitterConfig from '@/config/TwitterConfig';
+import ThreadsConfig from '@/config/ThreadsConfig';
+import TiktokConfig from '@/config/TiktokConfig';
+import InstagramConfig from '@/config/InstagramConfig';
 import type PlatformAdapter from '@/domain/PlatformAdapter';
 
 // `Cache`/`RateLimitStore` are abstract classes used as injection tokens; the
@@ -60,6 +71,82 @@ export default function createTestApp(overrides: TestAppOverrides = {}): Hono {
         overrides.config ?? {},
     );
     c.registerInstance(Config, config);
+    // TRANSITIONAL bridge: derive slices from the merged legacy `config` so both
+    // Config-based and slice-based consumers see the same test overrides. Removed
+    // in the cleanup task once TestAppOverrides becomes per-slice.
+    c.registerInstance(
+        AppConfig,
+        Object.assign(new AppConfig(), {
+            port: config.port,
+            publicBaseUrl: config.publicBaseUrl,
+            extraCrawlerUas: config.extraCrawlerUas,
+        }),
+    );
+    c.registerInstance(
+        ResolverConfig,
+        Object.assign(new ResolverConfig(), {
+            resolveTimeoutMs: config.resolveTimeoutMs,
+            cacheTtlSeconds: config.cacheTtlSeconds,
+        }),
+    );
+    c.registerInstance(
+        RateLimitConfig,
+        Object.assign(new RateLimitConfig(), {perMin: config.rateLimitPerMin}),
+    );
+    c.registerInstance(
+        ApiConfig,
+        Object.assign(new ApiConfig(), {
+            keys: config.apiKeys,
+            rateLimitPerMin: config.apiRateLimitPerMin,
+            batchMaxUrls: config.batchMaxUrls,
+        }),
+    );
+    c.registerInstance(
+        ProxyConfig,
+        Object.assign(new ProxyConfig(), {
+            secret: config.proxySecret,
+            hostAllowlist: config.proxyHostAllowlist,
+            maxConcurrent: config.proxyMaxConcurrent,
+            maxBytes: config.proxyMaxBytes,
+            timeoutMs: config.proxyTimeoutMs,
+        }),
+    );
+    c.registerInstance(
+        RedditConfig,
+        Object.assign(new RedditConfig(), {
+            clientId: config.redditClientId,
+            clientSecret: config.redditClientSecret,
+            proxyUrl: config.redditProxyUrl,
+            httpProxy: config.redditHttpProxy,
+        }),
+    );
+    c.registerInstance(
+        TwitchConfig,
+        Object.assign(new TwitchConfig(), {
+            clientId: config.twitchClientId,
+            clientSecret: config.twitchClientSecret,
+            gqlClientId: config.twitchGqlClientId,
+            gqlClipHash: config.twitchGqlClipHash,
+        }),
+    );
+    c.registerInstance(
+        TwitterConfig,
+        Object.assign(new TwitterConfig(), {
+            syndicationFeatures: config.twitterSyndicationFeatures,
+        }),
+    );
+    c.registerInstance(
+        ThreadsConfig,
+        Object.assign(new ThreadsConfig(), config.threads),
+    );
+    c.registerInstance(
+        TiktokConfig,
+        Object.assign(new TiktokConfig(), config.tiktok),
+    );
+    c.registerInstance(
+        InstagramConfig,
+        Object.assign(new InstagramConfig(), config.instagram),
+    );
     c.registerInstance(Logger, new Logger({write: () => {}}));
     c.registerInstance(HttpClient, overrides.httpClient ?? new HttpClient());
     c.registerInstance(cacheToken, overrides.cache ?? new MemoryCache());

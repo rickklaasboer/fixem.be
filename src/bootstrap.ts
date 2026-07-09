@@ -1,91 +1,45 @@
 import {Hono} from 'hono';
-import {RedisClient} from 'bun';
-import type {InjectionToken} from 'tsyringe';
-import {app, container} from '@/container';
+import type {DependencyContainer} from 'tsyringe';
+import {container} from '@/container';
 import routes from '@/http/routes';
 import Config, {loadConfig} from '@/config/Config';
-import Logger from '@/services/Logger';
-import HttpClient from '@/services/HttpClient';
-import Cache from '@/services/cache/Cache';
-import RedisCache from '@/services/cache/RedisCache';
-import RateLimitStore from '@/services/rate-limit/RateLimitStore';
-import RedisRateLimitStore from '@/services/rate-limit/RedisRateLimitStore';
-import AdapterRegistry from '@/domain/AdapterRegistry';
-import RedditAdapter from '@/adapters/RedditAdapter';
-import BlueskyAdapter from '@/adapters/BlueskyAdapter';
-import TwitterAdapter from '@/adapters/TwitterAdapter';
-import TwitchAdapter from '@/adapters/TwitchAdapter';
-import ThreadsAdapter from '@/adapters/ThreadsAdapter';
-import TiktokAdapter from '@/adapters/TiktokAdapter';
-import InstagramAdapter from '@/adapters/InstagramAdapter';
-import DummyAdapter from '@/adapters/DummyAdapter';
-import type PlatformAdapter from '@/domain/PlatformAdapter';
+import CoreServiceProvider from '@/providers/CoreServiceProvider';
+import CacheServiceProvider from '@/providers/CacheServiceProvider';
+import RateLimitServiceProvider from '@/providers/RateLimitServiceProvider';
+import ApiServiceProvider from '@/providers/ApiServiceProvider';
+import ProxyServiceProvider from '@/providers/ProxyServiceProvider';
+import AdapterServiceProvider from '@/providers/AdapterServiceProvider';
+import type ServiceProvider from '@/providers/ServiceProvider';
+import type {Env} from '@/config/env';
+
+// Order is behavioural: Core (Logger/HttpClient/app config) must register before
+// AdapterServiceProvider eagerly resolves adapters that inject them.
+const PROVIDERS = [
+    CoreServiceProvider,
+    CacheServiceProvider,
+    RateLimitServiceProvider,
+    ApiServiceProvider,
+    ProxyServiceProvider,
+    AdapterServiceProvider,
+];
 
 /**
- * Compose the application: register the leaf instances the container can't
- * build itself (config, sinks, Redis-backed stores, the ordered adapter
- * registry), then bind the routes onto a fresh Hono app. Everything else
- * (`@injectable`/`@singleton`) resolves on demand through the container.
+ * Compose the application: instantiate the ordered provider list, run every
+ * `register()` (bind phase) then every `boot()` (side-effect phase), and bind
+ * routes onto a fresh Hono app.
  */
-// `Cache`/`RateLimitStore` are abstract classes used as injection tokens; the
-// cast satisfies tsyringe's non-abstract `InjectionToken` type without changing
-// the runtime token identity that constructor injection matches against.
-const cacheToken = Cache as unknown as InjectionToken<Cache>;
-const rateLimitStoreToken =
-    RateLimitStore as unknown as InjectionToken<RateLimitStore>;
-
 export default function bootstrap(): Hono {
-    // Leaf values the container can't construct on its own.
-    container.registerInstance(Config, loadConfig());
-    const config = app(Config);
-    container.registerInstance(Logger, new Logger());
-    container.registerInstance(HttpClient, new HttpClient());
-    container.registerInstance(
-        cacheToken,
-        new RedisCache(
-            new RedisClient(config.redisUrl, {
-                enableOfflineQueue: false,
-                connectionTimeout: 2000,
-            }),
-        ),
-    );
-    container.registerInstance(
-        rateLimitStoreToken,
-        new RedisRateLimitStore(
-            new RedisClient(config.redisUrl, {
-                enableOfflineQueue: false,
-                connectionTimeout: 2000,
-            }),
-        ),
-    );
+    const env = process.env as Env;
 
-    // Ordered adapter registry — registry.find() returns the first match, so
-    // this order is behavioural. Mirrors the pre-refactor index.ts exactly,
-    // including splicing Twitch in at index 2 only when credentials are set.
-    const adapters: PlatformAdapter[] = [
-        app(RedditAdapter),
-        app(BlueskyAdapter),
-        app(TwitterAdapter),
-        app(ThreadsAdapter),
-        app(TiktokAdapter),
-        app(InstagramAdapter),
-        app(DummyAdapter),
-    ];
-    if (config.twitchClientId && config.twitchClientSecret) {
-        adapters.splice(2, 0, app(TwitchAdapter));
-    } else {
-        app(Logger).warn(
-            {},
-            'twitch adapter disabled: TWITCH_CLIENT_ID/SECRET not set',
-        );
-    }
-    if (!config.proxySecret) {
-        app(Logger).warn(
-            {},
-            'PROXY_SECRET not set: inline video (TikTok/Threads/Instagram) disabled — media degrades to thumbnail or link',
-        );
-    }
-    container.registerInstance(AdapterRegistry, new AdapterRegistry(adapters));
+    // TEMPORARY (removed in the config-migration cleanup): consumers still inject
+    // the flat `Config`; keep it registered until every consumer reads a slice.
+    container.registerInstance(Config, loadConfig(env));
+
+    const providers: ServiceProvider[] = PROVIDERS.map(
+        (P) => new P(container as DependencyContainer, env),
+    );
+    for (const p of providers) p.register();
+    for (const p of providers) p.boot();
 
     const server = new Hono();
     routes(server);

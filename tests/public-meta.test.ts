@@ -60,7 +60,9 @@ test('ok: flattens meta, derives needsProxy, never leaks proxyHeaders or ttlSeco
 test('proxied: attaches a signed playableUrl but keeps the raw url', async () => {
     const out = await renderer().toPublic(okVideo, {proxied: true});
     expect(out.video?.url).toBe('https://v16.tiktokcdn.com/a.mp4');
-    expect(out.video?.playableUrl?.startsWith('https://fixem.be/v/')).toBe(true);
+    expect(out.video?.playableUrl?.startsWith('https://fixem.be/v/')).toBe(
+        true,
+    );
     expect(JSON.stringify(out)).not.toContain('proxyHeaders');
 });
 

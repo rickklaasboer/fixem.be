@@ -160,9 +160,9 @@ describe('loadConfig', () => {
         expect(o.apiRateLimitPerMin).toBe(120);
         expect(o.batchMaxUrls).toBe(5);
         // below-floor values fall back (intMin), matching the other numeric knobs
-        expect(loadConfig({API_RATE_LIMIT_PER_MIN: '0'}).apiRateLimitPerMin).toBe(
-            60,
-        );
+        expect(
+            loadConfig({API_RATE_LIMIT_PER_MIN: '0'}).apiRateLimitPerMin,
+        ).toBe(60);
         expect(loadConfig({BATCH_MAX_URLS: '-3'}).batchMaxUrls).toBe(20);
     });
 

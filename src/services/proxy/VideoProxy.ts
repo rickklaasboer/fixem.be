@@ -58,7 +58,10 @@ export default class VideoProxy {
         }
         if (
             u.protocol !== 'https:' ||
-            !VideoProxy.isHostAllowed(u.hostname, this.config.proxyHostAllowlist)
+            !VideoProxy.isHostAllowed(
+                u.hostname,
+                this.config.proxyHostAllowlist,
+            )
         ) {
             return null;
         }

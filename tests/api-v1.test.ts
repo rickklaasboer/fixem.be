@@ -84,7 +84,10 @@ describe('GET /api/v1/resolve', () => {
 
     test('ok: raw url + needsProxy, no playableUrl, no proxyHeaders leak', async () => {
         const app = createTestApp({config: cfg(), adapters: [proxAdapter]});
-        const res = await authed(app, '/api/v1/resolve?url=https://prox.test/1');
+        const res = await authed(
+            app,
+            '/api/v1/resolve?url=https://prox.test/1',
+        );
         expect(res.status).toBe(200);
         expect(res.headers.get('X-RateLimit-Limit')).toBe('60');
         const body = (await res.json()) as Record<string, any>;
@@ -172,10 +175,7 @@ describe('GET /api/v1/health', () => {
 
     test('with url → adapter outcome payload (same shape as old status)', async () => {
         const app = createTestApp({config: cfg(), adapters: [proxAdapter]});
-        const res = await authed(
-            app,
-            '/api/v1/health?url=https://prox.test/1',
-        );
+        const res = await authed(app, '/api/v1/health?url=https://prox.test/1');
         const body = (await res.json()) as Record<string, any>;
         expect(body.platform).toBe('prox');
         expect(body.status).toBe('ok');
@@ -195,11 +195,7 @@ describe('POST /api/v1/resolve (batch)', () => {
     test('resolves in request order with per-item isolation', async () => {
         const app = createTestApp({config: cfg(), adapters: [proxAdapter]});
         const res = await post(app, {
-            urls: [
-                'https://prox.test/1',
-                'not a url',
-                'https://unknown.dev/x',
-            ],
+            urls: ['https://prox.test/1', 'not a url', 'https://unknown.dev/x'],
         });
         expect(res.status).toBe(200);
         const body = (await res.json()) as {results: Record<string, any>[]};

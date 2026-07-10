@@ -102,8 +102,9 @@ test('passes through metadata with no proxyHeaders unchanged', async () => {
         ...base,
         video: {url: 'https://x/y.mp4', mimeType: 'video/mp4'},
     };
-    const out = await makeVp({secret: 's', hostAllowlist: ['twimg.com']}).rewrite(
-        m,
-    );
+    const out = await makeVp({
+        secret: 's',
+        hostAllowlist: ['twimg.com'],
+    }).rewrite(m);
     expect(out).toEqual(m);
 });

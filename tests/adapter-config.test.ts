@@ -74,10 +74,12 @@ describe('Threads/Tiktok/Instagram config', () => {
         expect(ThreadsConfig.fromEnv({THREADS_LSD: ''}).lsd).toBe(
             THREADS_DEFAULTS.lsd,
         );
-        expect(ThreadsConfig.fromEnv({THREADS_DOC_ID: 'custom-doc'}).docId).toBe(
-            'custom-doc',
+        expect(
+            ThreadsConfig.fromEnv({THREADS_DOC_ID: 'custom-doc'}).docId,
+        ).toBe('custom-doc');
+        expect(TiktokConfig.fromEnv({}).deviceId).toBe(
+            TIKTOK_DEFAULTS.deviceId,
         );
-        expect(TiktokConfig.fromEnv({}).deviceId).toBe(TIKTOK_DEFAULTS.deviceId);
         expect(
             TiktokConfig.fromEnv({TIKTOK_REHYDRATION_SCRIPT_ID: '__CUSTOM__'})
                 .rehydrationScriptId,
@@ -86,9 +88,9 @@ describe('Threads/Tiktok/Instagram config', () => {
         expect(ig.docId).toBe(INSTAGRAM_DEFAULTS.docId);
         expect(ig.proxyUrl).toBeUndefined();
         expect(ig.snapsave).toBe(false);
-        expect(InstagramConfig.fromEnv({INSTAGRAM_SNAPSAVE: '1'}).snapsave).toBe(
-            true,
-        );
+        expect(
+            InstagramConfig.fromEnv({INSTAGRAM_SNAPSAVE: '1'}).snapsave,
+        ).toBe(true);
         expect(InstagramConfig.fromEnv({INSTAGRAM_APP_ID: ''}).appId).toBe(
             INSTAGRAM_DEFAULTS.appId,
         );

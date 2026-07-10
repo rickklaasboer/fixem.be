@@ -15,7 +15,8 @@ export default class TwitchConfig {
     static fromEnv(env: Env): TwitchConfig {
         return Object.assign(new TwitchConfig(), {
             clientId: getEnvString(env, 'TWITCH_CLIENT_ID') ?? undefined,
-            clientSecret: getEnvString(env, 'TWITCH_CLIENT_SECRET') ?? undefined,
+            clientSecret:
+                getEnvString(env, 'TWITCH_CLIENT_SECRET') ?? undefined,
             gqlClientId: getEnvString(
                 env,
                 'TWITCH_GQL_CLIENT_ID',

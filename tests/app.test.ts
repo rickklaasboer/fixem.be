@@ -389,7 +389,8 @@ test('tiktok URL routes through the full app with a fixture-backed adapter', asy
         new HttpClient(fetchFn),
     );
     const app = createTestApp({
-        proxy: {secret: 's'}, app: {publicBaseUrl: 'https://fixem.be'},
+        proxy: {secret: 's'},
+        app: {publicBaseUrl: 'https://fixem.be'},
         adapters: [adapter],
     });
     const res = await get(
@@ -425,7 +426,8 @@ test('proxied video is rewritten to a signed /v/ URL', async () => {
         }),
     };
     const app = createTestApp({
-        proxy: {secret: 's'}, app: {publicBaseUrl: 'https://fixem.be'},
+        proxy: {secret: 's'},
+        app: {publicBaseUrl: 'https://fixem.be'},
         adapters: [proxAdapter],
     });
     const res = await get(app, '/https://prox.test/1', DISCORD_UA);
@@ -482,7 +484,8 @@ test('proxy-required video on a non-allowlisted host drops to link (not a 403 pl
     };
     const res = await get(
         createTestApp({
-            proxy: {secret: 's'}, app: {publicBaseUrl: 'https://fixem.be'},
+            proxy: {secret: 's'},
+            app: {publicBaseUrl: 'https://fixem.be'},
             adapters: [proxAdapter],
         }),
         '/https://prox.test/1',

@@ -163,9 +163,7 @@ export default class RedditAdapter extends BaseAdapter {
         url: URL,
         signal?: AbortSignal,
     ): Promise<EmbedMetadata> {
-        const hasCreds = !!(
-            this.config.clientId && this.config.clientSecret
-        );
+        const hasCreds = !!(this.config.clientId && this.config.clientSecret);
         let canonical = this.canonicalize(url);
         if (SHARE_RE.test(url.pathname)) {
             // The .json endpoint 307s share links to a non-JSON target, so follow
@@ -252,9 +250,7 @@ export default class RedditAdapter extends BaseAdapter {
     // Standard HTTP CONNECT proxy (`http://user:pass@host:port`), passed as
     // Bun's fetch `proxy` option — for per-GB residential providers.
     private proxyInit(): {proxy?: string} {
-        return this.config.httpProxy
-            ? {proxy: this.config.httpProxy}
-            : {};
+        return this.config.httpProxy ? {proxy: this.config.httpProxy} : {};
     }
 
     // App-only (client_credentials) token manager, cached on the instance so

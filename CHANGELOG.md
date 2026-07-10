@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.2.0](https://github.com///compare/v2.1.1...v2.2.0) (2026-07-10)
+
+### Features
+
+* add core per-domain config classes ([37ad639](https://github.com///commit/37ad639e154cab864afc9307961e5a30fd552eeb))
+* add per-adapter config classes ([2bb1105](https://github.com///commit/2bb1105d736981eb946135837fd0236da2dec4ff))
+* add service-provider base and six providers ([85eb9c5](https://github.com///commit/85eb9c5527c6adb59b50f332a852fefd8e50a0bf))
+* add typed env-parsing helpers ([390c555](https://github.com///commit/390c555fe3776169ca9a0407f9ae8deb94e645c0))
+
 ## [2.1.1](https://github.com///compare/v2.1.0...v2.1.1) (2026-07-09)
 
 ### Bug Fixes

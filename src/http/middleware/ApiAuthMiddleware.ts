@@ -1,7 +1,7 @@
 import {singleton} from 'tsyringe';
 import type {MiddlewareHandler} from 'hono';
 import type Middleware from '@/http/middleware/Middleware';
-import Config from '@/config/Config';
+import ApiConfig from '@/config/ApiConfig';
 import Secrets from '@/support/Secrets';
 
 /**
@@ -11,14 +11,14 @@ import Secrets from '@/support/Secrets';
  */
 @singleton()
 export default class ApiAuthMiddleware implements Middleware {
-    constructor(private config: Config) {}
+    constructor(private config: ApiConfig) {}
 
     public handle: MiddlewareHandler = async (c, next) => {
-        if (this.config.apiKeys.length === 0) {
+        if (this.config.keys.length === 0) {
             return c.json({error: 'not found'}, 404);
         }
         const provided = Secrets.bearer(c.req.header('Authorization'));
-        for (const key of this.config.apiKeys) {
+        for (const key of this.config.keys) {
             if (await Secrets.match(provided, key)) {
                 await next();
                 return;

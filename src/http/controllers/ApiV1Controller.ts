@@ -4,7 +4,7 @@ import Resolver from '@/domain/Resolver';
 import PublicMetaRenderer from '@/render/PublicMetaRenderer';
 import AdapterRegistry from '@/domain/AdapterRegistry';
 import Cache from '@/services/cache/Cache';
-import Config from '@/config/Config';
+import ApiConfig from '@/config/ApiConfig';
 import {PLATFORM_CAPABILITIES} from '@/domain/platformCapabilities';
 
 /**
@@ -19,7 +19,7 @@ export default class ApiV1Controller {
         private publicMeta: PublicMetaRenderer,
         private registry: AdapterRegistry,
         private cache: Cache,
-        private config: Config,
+        private config: ApiConfig,
     ) {}
 
     private static parseUrl(raw: string | undefined): URL | null {

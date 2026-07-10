@@ -2,7 +2,7 @@ import {describe, expect, test} from 'bun:test';
 import type {Hono} from 'hono';
 import createTestApp from './support/createTestApp';
 import {PLATFORM_CAPABILITIES} from '@/domain/platformCapabilities';
-import type Config from '@/config/Config';
+import type {TestAppOverrides} from './support/createTestApp';
 import type PlatformAdapter from '@/domain/PlatformAdapter';
 
 const KEY = 'k-test';
@@ -29,11 +29,10 @@ const proxAdapter: PlatformAdapter = {
     }),
 };
 
-const cfg = (extra: Partial<Config> = {}): Partial<Config> => ({
-    apiKeys: [KEY],
-    proxySecret: 's',
-    proxyHostAllowlist: ['tiktokcdn.com'],
-    publicBaseUrl: 'https://fixem.be',
+const cfg = (extra: TestAppOverrides = {}): TestAppOverrides => ({
+    api: {keys: [KEY]},
+    proxy: {secret: 's', hostAllowlist: ['tiktokcdn.com']},
+    app: {publicBaseUrl: 'https://fixem.be'},
     ...extra,
 });
 
@@ -70,7 +69,7 @@ describe('platformCapabilities', () => {
 
 describe('GET /api/v1/resolve', () => {
     test('401 without a bearer token; 404 when no keys configured', async () => {
-        const app = createTestApp({config: cfg(), adapters: [proxAdapter]});
+        const app = createTestApp({...cfg(), adapters: [proxAdapter]});
         expect(
             (await app.request('/api/v1/resolve?url=https://prox.test/1'))
                 .status,
@@ -83,7 +82,7 @@ describe('GET /api/v1/resolve', () => {
     });
 
     test('ok: raw url + needsProxy, no playableUrl, no proxyHeaders leak', async () => {
-        const app = createTestApp({config: cfg(), adapters: [proxAdapter]});
+        const app = createTestApp({...cfg(), adapters: [proxAdapter]});
         const res = await authed(
             app,
             '/api/v1/resolve?url=https://prox.test/1',
@@ -101,7 +100,7 @@ describe('GET /api/v1/resolve', () => {
     });
 
     test('media=proxied attaches a signed playableUrl', async () => {
-        const app = createTestApp({config: cfg(), adapters: [proxAdapter]});
+        const app = createTestApp({...cfg(), adapters: [proxAdapter]});
         const res = await authed(
             app,
             '/api/v1/resolve?media=proxied&url=https://prox.test/1',
@@ -111,7 +110,7 @@ describe('GET /api/v1/resolve', () => {
     });
 
     test('no-adapter and missing/malformed url', async () => {
-        const app = createTestApp({config: cfg(), adapters: [proxAdapter]});
+        const app = createTestApp({...cfg(), adapters: [proxAdapter]});
         const na = await authed(
             app,
             '/api/v1/resolve?url=https://unknown.dev/x',
@@ -138,7 +137,7 @@ describe('GET /api/v1/canonical', () => {
                 throw new Error('should not fetch');
             },
         };
-        const app = createTestApp({config: cfg(), adapters: [adapter]});
+        const app = createTestApp({...cfg(), adapters: [adapter]});
         const res = await authed(
             app,
             '/api/v1/canonical?url=https://prox.test/abc',
@@ -158,7 +157,7 @@ describe('GET /api/v1/canonical', () => {
 
 describe('GET /api/v1/platforms', () => {
     test('lists only registered platforms with capability flags', async () => {
-        const app = createTestApp({config: cfg(), adapters: [proxAdapter]});
+        const app = createTestApp({...cfg(), adapters: [proxAdapter]});
         const res = await authed(app, '/api/v1/platforms');
         const body = (await res.json()) as {platforms: {name: string}[]};
         // prox has no capability row → not advertised; the table is intersected
@@ -168,13 +167,13 @@ describe('GET /api/v1/platforms', () => {
 
 describe('GET /api/v1/health', () => {
     test('no url → liveness {ok, redis}', async () => {
-        const app = createTestApp({config: cfg(), adapters: [proxAdapter]});
+        const app = createTestApp({...cfg(), adapters: [proxAdapter]});
         const res = await authed(app, '/api/v1/health');
         expect(await res.json()).toEqual({ok: true, redis: true});
     });
 
     test('with url → adapter outcome payload (same shape as old status)', async () => {
-        const app = createTestApp({config: cfg(), adapters: [proxAdapter]});
+        const app = createTestApp({...cfg(), adapters: [proxAdapter]});
         const res = await authed(app, '/api/v1/health?url=https://prox.test/1');
         const body = (await res.json()) as Record<string, any>;
         expect(body.platform).toBe('prox');
@@ -193,7 +192,7 @@ describe('POST /api/v1/resolve (batch)', () => {
         });
 
     test('resolves in request order with per-item isolation', async () => {
-        const app = createTestApp({config: cfg(), adapters: [proxAdapter]});
+        const app = createTestApp({...cfg(), adapters: [proxAdapter]});
         const res = await post(app, {
             urls: ['https://prox.test/1', 'not a url', 'https://unknown.dev/x'],
         });
@@ -219,7 +218,7 @@ describe('POST /api/v1/resolve (batch)', () => {
 
     test('empty, non-array, or over-limit lists → 400', async () => {
         const app = createTestApp({
-            config: cfg({batchMaxUrls: 2}),
+            ...cfg({api: {keys: [KEY], batchMaxUrls: 2}}),
             adapters: [proxAdapter],
         });
         expect((await post(app, {urls: []})).status).toBe(400);

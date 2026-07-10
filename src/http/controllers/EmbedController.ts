@@ -4,7 +4,7 @@ import Resolver from '@/domain/Resolver';
 import MetaHtmlRenderer from '@/render/MetaHtmlRenderer';
 import VideoProxy from '@/services/proxy/VideoProxy';
 import Crawler from '@/support/Crawler';
-import Config from '@/config/Config';
+import AppConfig from '@/config/AppConfig';
 import Logger from '@/services/Logger';
 import TargetUrl from '@/support/TargetUrl';
 
@@ -23,12 +23,12 @@ export default class EmbedController {
         private renderer: MetaHtmlRenderer,
         private videoProxy: VideoProxy,
         private crawler: Crawler,
-        private config: Config,
+        private app: AppConfig,
         private logger: Logger,
     ) {}
 
     private oembedUrlFor(canonicalUrl: string): string {
-        return `${this.config.publicBaseUrl}/oembed?url=${encodeURIComponent(canonicalUrl)}`;
+        return `${this.app.publicBaseUrl}/oembed?url=${encodeURIComponent(canonicalUrl)}`;
     }
 
     /**
@@ -51,7 +51,7 @@ export default class EmbedController {
         if (!parsed.ok) return c.text(USAGE_HINT, 400);
 
         const ua = c.req.header('User-Agent');
-        const crawler = this.crawler.isCrawler(ua, this.config.extraCrawlerUas);
+        const crawler = this.crawler.isCrawler(ua, this.app.extraCrawlerUas);
 
         if (!crawler && !preview) {
             const canonical = this.resolver.canonicalFor(parsed.url);

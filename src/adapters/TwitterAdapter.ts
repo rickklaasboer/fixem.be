@@ -1,6 +1,6 @@
 import {injectable} from 'tsyringe';
 import BaseAdapter from '@/adapters/BaseAdapter';
-import Config from '@/config/Config';
+import TwitterConfig from '@/config/TwitterConfig';
 import HttpClient from '@/services/HttpClient';
 import Text from '@/support/Text';
 import type EmbedMetadata from '@/domain/EmbedMetadata';
@@ -56,7 +56,7 @@ export default class TwitterAdapter extends BaseAdapter {
     public name = 'twitter';
 
     constructor(
-        private config: Config,
+        private config: TwitterConfig,
         private http: HttpClient,
     ) {
         super();
@@ -84,7 +84,7 @@ export default class TwitterAdapter extends BaseAdapter {
         const apiUrl =
             `https://cdn.syndication.twimg.com/tweet-result?id=${p.id}` +
             `&lang=en&token=${syndicationToken(p.id)}` +
-            `&features=${encodeURIComponent(this.config.twitterSyndicationFeatures)}`;
+            `&features=${encodeURIComponent(this.config.syndicationFeatures)}`;
         const j = await this.http.getJson<SynTweet>(apiUrl, {signal});
         if (!j?.__typename) throw new Error('twitter: tweet unavailable');
 

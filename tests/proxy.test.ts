@@ -1,6 +1,7 @@
 import {describe, expect, test} from 'bun:test';
 import {Hono} from 'hono';
-import {loadConfig} from '@/config/Config';
+import ProxyConfig from '@/config/ProxyConfig';
+import RateLimitConfig from '@/config/RateLimitConfig';
 import Logger from '@/services/Logger';
 import Clock from '@/services/Clock';
 import HttpClient, {type FetchFn} from '@/services/HttpClient';
@@ -18,10 +19,12 @@ async function appWith(
     fetchFn: FetchFn,
     overrides: Record<string, string> = {},
 ) {
-    const config = loadConfig({PROXY_SECRET: SECRET, ...overrides});
+    const proxy = ProxyConfig.fromEnv({PROXY_SECRET: SECRET, ...overrides});
+    const rateLimit = RateLimitConfig.fromEnv(overrides);
     const app = new Hono();
     const streamer = new ProxyStreamer(
-        config,
+        proxy,
+        rateLimit,
         silent,
         new MemoryRateLimitStore(),
         clock,
@@ -121,10 +124,11 @@ describe('/v/ proxy', () => {
     });
 
     test('404 when proxy secret is unset (disabled)', async () => {
-        const config = loadConfig({}); // no PROXY_SECRET
+        const proxy = ProxyConfig.fromEnv({}); // no PROXY_SECRET
         const app = new Hono();
         const streamer = new ProxyStreamer(
-            config,
+            proxy,
+            RateLimitConfig.fromEnv({}),
             silent,
             new MemoryRateLimitStore(),
             clock,

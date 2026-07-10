@@ -1,6 +1,6 @@
 import {injectable} from 'tsyringe';
 import BaseAdapter from '@/adapters/BaseAdapter';
-import Config from '@/config/Config';
+import InstagramConfig from '@/config/InstagramConfig';
 import HttpClient, {CHROME_UA} from '@/services/HttpClient';
 import Snapsave from '@/services/Snapsave';
 import Text from '@/support/Text';
@@ -201,7 +201,7 @@ export default class InstagramAdapter extends BaseAdapter {
     public name = 'instagram';
 
     constructor(
-        private config: Config,
+        private config: InstagramConfig,
         private http: HttpClient,
         private snapsave: Snapsave,
     ) {
@@ -226,7 +226,7 @@ export default class InstagramAdapter extends BaseAdapter {
         url: URL,
         signal?: AbortSignal,
     ): Promise<EmbedMetadata> {
-        const cfg = this.config.instagram;
+        const cfg = this.config;
         const code = codeOf(url);
         if (!code) throw new Error('instagram: not a post URL');
         const canonical = `https://www.instagram.com/p/${code}`;
@@ -337,7 +337,7 @@ export default class InstagramAdapter extends BaseAdapter {
         code: string,
         signal?: AbortSignal,
     ): Promise<MobileItem | null> {
-        const cfg = this.config.instagram;
+        const cfg = this.config;
         if (!cfg.cookie) return null;
         const mediaId = shortcodeToMediaId(code);
         if (!mediaId) return null;
@@ -372,7 +372,7 @@ export default class InstagramAdapter extends BaseAdapter {
         code: string,
         signal?: AbortSignal,
     ): Promise<ShortcodeMedia | null> {
-        const cfg = this.config.instagram;
+        const cfg = this.config;
         // proxyUrl offload hook: if set, route the request through it by prepending
         // the prefix + encoded target. A full residential-proxy client (auth, CONNECT
         // tunneling) is out of scope — this is the minimal wiring point.

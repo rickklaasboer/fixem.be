@@ -1,5 +1,6 @@
 import {singleton} from 'tsyringe';
-import Config from '@/config/Config';
+import ProxyConfig from '@/config/ProxyConfig';
+import AppConfig from '@/config/AppConfig';
 import ProxySigner from '@/services/proxy/ProxySigner';
 import Clock from '@/services/Clock';
 import Logger from '@/services/Logger';
@@ -15,7 +16,8 @@ const PROXY_TOKEN_TTL_MS = 3_600_000;
 @singleton()
 export default class VideoProxy {
     constructor(
-        private config: Config,
+        private proxy: ProxyConfig,
+        private app: AppConfig,
         private signer: ProxySigner,
         private clock: Clock,
         private logger: Logger,
@@ -49,7 +51,7 @@ export default class VideoProxy {
         video: NonNullable<EmbedMetadata['video']>,
     ): Promise<string | null> {
         if (!video.proxyHeaders) return null;
-        if (!this.config.proxySecret) return null;
+        if (!this.proxy.secret) return null;
         let u: URL;
         try {
             u = new URL(video.url);
@@ -58,19 +60,16 @@ export default class VideoProxy {
         }
         if (
             u.protocol !== 'https:' ||
-            !VideoProxy.isHostAllowed(
-                u.hostname,
-                this.config.proxyHostAllowlist,
-            )
+            !VideoProxy.isHostAllowed(u.hostname, this.proxy.hostAllowlist)
         ) {
             return null;
         }
-        const token = await this.signer.sign(this.config.proxySecret, {
+        const token = await this.signer.sign(this.proxy.secret, {
             url: video.url,
             headers: video.proxyHeaders,
             exp: this.clock.now() + PROXY_TOKEN_TTL_MS,
         });
-        return `${this.config.publicBaseUrl}/v/${token}`;
+        return `${this.app.publicBaseUrl}/v/${token}`;
     }
 
     /**
@@ -81,7 +80,7 @@ export default class VideoProxy {
     public async rewrite(meta: EmbedMetadata): Promise<EmbedMetadata> {
         if (!meta.video?.proxyHeaders) return meta;
         // Proxy required but disabled → drop rather than emit an unplayable CDN URL.
-        if (!this.config.proxySecret) return this.dropVideo(meta);
+        if (!this.proxy.secret) return this.dropVideo(meta);
         const signed = await this.signedUrlFor(meta.video);
         // proxySecret is set, so a null here means the /v/ route only fetches https
         // allowlisted hosts and this one isn't — a minted token would always 403. A

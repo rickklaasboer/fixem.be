@@ -1,13 +1,13 @@
 import {describe, expect, test} from 'bun:test';
 import TiktokAdapter from '@/adapters/TiktokAdapter';
 import {TIKTOK_DEFAULTS} from '@/config/defaults';
-import Config from '@/config/Config';
+import TiktokConfig from '@/config/TiktokConfig';
 import HttpClient, {CHROME_UA} from '@/services/HttpClient';
 import type {FetchFn} from '@/services/HttpClient';
 import videoFixture from './fixtures/tiktok/universal-video.json';
 import photoFixture from './fixtures/tiktok/universal-photo.json';
 
-const CONFIG = {tiktok: TIKTOK_DEFAULTS} as unknown as Config;
+const CONFIG = TIKTOK_DEFAULTS as unknown as TiktokConfig;
 
 interface Recorded {
     url: string;
@@ -351,11 +351,9 @@ describe('tiktok adapter', () => {
             })) as unknown as FetchFn;
         const ad = new TiktokAdapter(
             {
-                tiktok: {
-                    ...TIKTOK_DEFAULTS,
-                    rehydrationScriptId: '__CUSTOM_DATA__',
-                },
-            } as unknown as Config,
+                ...TIKTOK_DEFAULTS,
+                rehydrationScriptId: '__CUSTOM_DATA__',
+            } as unknown as TiktokConfig,
             new HttpClient(fetchFn),
         );
         const m = await ad.resolve(VIDEO_URL);

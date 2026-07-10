@@ -1,7 +1,8 @@
 import {singleton} from 'tsyringe';
 import type {MiddlewareHandler} from 'hono';
 import type Middleware from '@/http/middleware/Middleware';
-import Config from '@/config/Config';
+import AppConfig from '@/config/AppConfig';
+import RateLimitConfig from '@/config/RateLimitConfig';
 import RateLimitStore from '@/services/rate-limit/RateLimitStore';
 import Clock from '@/services/Clock';
 import Crawler from '@/support/Crawler';
@@ -14,7 +15,8 @@ import Crawler from '@/support/Crawler';
 @singleton()
 export default class RateLimitMiddleware implements Middleware {
     constructor(
-        private config: Config,
+        private app: AppConfig,
+        private rateLimit: RateLimitConfig,
         private store: RateLimitStore,
         private clock: Clock,
         private crawler: Crawler,
@@ -24,7 +26,7 @@ export default class RateLimitMiddleware implements Middleware {
         if (
             this.crawler.isCrawler(
                 c.req.header('User-Agent'),
-                this.config.extraCrawlerUas,
+                this.app.extraCrawlerUas,
             )
         ) {
             return next();
@@ -34,7 +36,7 @@ export default class RateLimitMiddleware implements Middleware {
             60_000,
             this.clock.now(),
         );
-        if (hits > this.config.rateLimitPerMin) {
+        if (hits > this.rateLimit.perMin) {
             return c.text('rate limited, try again shortly', 429);
         }
         return next();

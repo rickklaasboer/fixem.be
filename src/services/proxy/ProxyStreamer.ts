@@ -1,6 +1,7 @@
 import {singleton} from 'tsyringe';
 import type {Context} from 'hono';
-import Config from '@/config/Config';
+import ProxyConfig from '@/config/ProxyConfig';
+import RateLimitConfig from '@/config/RateLimitConfig';
 import Logger from '@/services/Logger';
 import RateLimitStore from '@/services/rate-limit/RateLimitStore';
 import Clock from '@/services/Clock';
@@ -123,7 +124,8 @@ export default class ProxyStreamer {
     private inflight = 0;
 
     constructor(
-        private config: Config,
+        private proxy: ProxyConfig,
+        private rateLimit: RateLimitConfig,
         private logger: Logger,
         private rateLimitStore: RateLimitStore,
         private clock: Clock,
@@ -132,7 +134,7 @@ export default class ProxyStreamer {
     ) {}
 
     public async stream(c: Context): Promise<Response> {
-        if (!this.config.proxySecret) return c.text('proxy disabled', 404);
+        if (!this.proxy.secret) return c.text('proxy disabled', 404);
 
         // Rate limit per client IP — a valid token is replayable for its lifetime,
         // so without this /v/ is an unmetered bandwidth relay for allowlisted CDNs.
@@ -141,11 +143,11 @@ export default class ProxyStreamer {
             60_000,
             this.clock.now(),
         );
-        if (hits > this.config.rateLimitPerMin)
+        if (hits > this.rateLimit.perMin)
             return c.text('rate limited, try again shortly', 429);
 
         const payload = await this.signer.verify(
-            this.config.proxySecret,
+            this.proxy.secret,
             // `Context` here is generic (this method isn't the route-registration
             // call site), so Hono can't narrow the param to a guaranteed string.
             // The route pattern (`/v/:token`) always supplies it; the empty-string
@@ -162,10 +164,10 @@ export default class ProxyStreamer {
         } catch {
             return c.text('bad target', 400);
         }
-        if (!proxyable(target, this.config.proxyHostAllowlist))
+        if (!proxyable(target, this.proxy.hostAllowlist))
             return c.text('forbidden', 403);
 
-        if (this.inflight >= this.config.proxyMaxConcurrent)
+        if (this.inflight >= this.proxy.maxConcurrent)
             return c.text('busy', 503);
         this.inflight++;
         // Release the concurrency slot exactly once. On the streaming success path
@@ -182,10 +184,7 @@ export default class ProxyStreamer {
         // Timeout the connect/header phase only — a slow first byte fails fast, but
         // a healthy large stream is not killed mid-body. The byteCeiling bounds size.
         const abort = new AbortController();
-        const timer = setTimeout(
-            () => abort.abort(),
-            this.config.proxyTimeoutMs,
-        );
+        const timer = setTimeout(() => abort.abort(), this.proxy.timeoutMs);
         try {
             const fwd = new Headers(payload.headers);
             const range = c.req.header('Range');
@@ -218,7 +217,7 @@ export default class ProxyStreamer {
                 } catch {
                     return c.text('bad gateway', 502);
                 }
-                if (!proxyable(next, this.config.proxyHostAllowlist)) {
+                if (!proxyable(next, this.proxy.hostAllowlist)) {
                     this.logger.warn(
                         {host: next.hostname},
                         'proxy redirect host not allowed',
@@ -236,7 +235,7 @@ export default class ProxyStreamer {
                 return c.text('bad gateway', 502);
             }
             const total = declaredLength(up);
-            if (total !== null && total > this.config.proxyMaxBytes) {
+            if (total !== null && total > this.proxy.maxBytes) {
                 return c.text('bad gateway', 502);
             }
             const h = new Headers();
@@ -254,10 +253,10 @@ export default class ProxyStreamer {
             // large-file streams). The finally must NOT also release it.
             streaming = true;
             const body = streamProxyBody(
-                up.body.pipeThrough(byteCeiling(this.config.proxyMaxBytes)),
+                up.body.pipeThrough(byteCeiling(this.proxy.maxBytes)),
                 release,
                 () => abort.abort(),
-                this.config.proxyTimeoutMs,
+                this.proxy.timeoutMs,
             );
             return new Response(body, {status: up.status, headers: h});
         } catch (err) {

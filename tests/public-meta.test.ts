@@ -4,21 +4,30 @@ import VideoProxy from '@/services/proxy/VideoProxy';
 import ProxySigner from '@/services/proxy/ProxySigner';
 import Clock from '@/services/Clock';
 import Logger from '@/services/Logger';
-import type Config from '@/config/Config';
+import ProxyConfig from '@/config/ProxyConfig';
+import AppConfig from '@/config/AppConfig';
 import type ResolveOutcome from '@/domain/ResolveOutcome';
 
 const clock = {now: () => 1000} as Clock;
 const logger = new Logger({write() {}});
 
-function renderer(cfg: Partial<Config> = {}): PublicMetaRenderer {
-    const config = {
-        proxySecret: 's',
-        proxyHostAllowlist: ['tiktokcdn.com'],
+function renderer(
+    cfg: {secret?: string; hostAllowlist?: string[]} = {},
+): PublicMetaRenderer {
+    const proxy = Object.assign(new ProxyConfig(), {
+        secret: cfg.secret ?? 's',
+        hostAllowlist: cfg.hostAllowlist ?? ['tiktokcdn.com'],
+        maxConcurrent: 32,
+        maxBytes: 104857600,
+        timeoutMs: 10000,
+    });
+    const app = Object.assign(new AppConfig(), {
+        port: 3000,
         publicBaseUrl: 'https://fixem.be',
-        ...cfg,
-    } as unknown as Config;
+        extraCrawlerUas: [],
+    });
     return new PublicMetaRenderer(
-        new VideoProxy(config, new ProxySigner(), clock, logger),
+        new VideoProxy(proxy, app, new ProxySigner(), clock, logger),
     );
 }
 
@@ -67,7 +76,7 @@ test('proxied: attaches a signed playableUrl but keeps the raw url', async () =>
 });
 
 test('proxied but not allowlisted: playableUrl omitted, never a 403 URL', async () => {
-    const out = await renderer({proxyHostAllowlist: ['example.com']}).toPublic(
+    const out = await renderer({hostAllowlist: ['example.com']}).toPublic(
         okVideo,
         {proxied: true},
     );

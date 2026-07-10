@@ -1,6 +1,6 @@
 import {injectable} from 'tsyringe';
 import BaseAdapter from '@/adapters/BaseAdapter';
-import Config from '@/config/Config';
+import RedditConfig from '@/config/RedditConfig';
 import HttpClient, {CHROME_UA, PLATFORM_UA} from '@/services/HttpClient';
 import Text from '@/support/Text';
 import type EmbedMetadata from '@/domain/EmbedMetadata';
@@ -138,7 +138,7 @@ export default class RedditAdapter extends BaseAdapter {
     private cachedToken?: {token: string; expiresAt: number};
 
     constructor(
-        private config: Config,
+        private config: RedditConfig,
         private http: HttpClient,
     ) {
         super();
@@ -163,9 +163,7 @@ export default class RedditAdapter extends BaseAdapter {
         url: URL,
         signal?: AbortSignal,
     ): Promise<EmbedMetadata> {
-        const hasCreds = !!(
-            this.config.redditClientId && this.config.redditClientSecret
-        );
+        const hasCreds = !!(this.config.clientId && this.config.clientSecret);
         let canonical = this.canonicalize(url);
         if (SHARE_RE.test(url.pathname)) {
             // The .json endpoint 307s share links to a non-JSON target, so follow
@@ -244,17 +242,15 @@ export default class RedditAdapter extends BaseAdapter {
     // The OAuth path never uses either (authorized requests aren't IP-blocked, and
     // credentials must not transit a third party).
     private viaProxy(url: string): string {
-        return this.config.redditProxyUrl
-            ? this.config.redditProxyUrl + encodeURIComponent(url)
+        return this.config.proxyUrl
+            ? this.config.proxyUrl + encodeURIComponent(url)
             : url;
     }
 
     // Standard HTTP CONNECT proxy (`http://user:pass@host:port`), passed as
     // Bun's fetch `proxy` option — for per-GB residential providers.
     private proxyInit(): {proxy?: string} {
-        return this.config.redditHttpProxy
-            ? {proxy: this.config.redditHttpProxy}
-            : {};
+        return this.config.httpProxy ? {proxy: this.config.httpProxy} : {};
     }
 
     // App-only (client_credentials) token manager, cached on the instance so
@@ -268,7 +264,7 @@ export default class RedditAdapter extends BaseAdapter {
         const res = await this.http.fetch(TOKEN_URL, {
             method: 'POST',
             headers: {
-                Authorization: `Basic ${btoa(`${this.config.redditClientId}:${this.config.redditClientSecret}`)}`,
+                Authorization: `Basic ${btoa(`${this.config.clientId}:${this.config.clientSecret}`)}`,
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'User-Agent': PLATFORM_UA,
             },

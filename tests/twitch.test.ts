@@ -1,17 +1,17 @@
 import {describe, expect, test} from 'bun:test';
 import TwitchAdapter from '@/adapters/TwitchAdapter';
-import Config from '@/config/Config';
+import TwitchConfig from '@/config/TwitchConfig';
 import HttpClient from '@/services/HttpClient';
 import type {FetchFn} from '@/services/HttpClient';
 import helixClip from './fixtures/twitch/helix-clip.json';
 import gqlClip from './fixtures/twitch/gql-clip.json';
 
 const CONFIG = {
-    twitchClientId: 'cid',
-    twitchClientSecret: 'sec',
-    twitchGqlClientId: 'gqlcid',
-    twitchGqlClipHash: 'gqlhash',
-} as unknown as Config;
+    clientId: 'cid',
+    clientSecret: 'sec',
+    gqlClientId: 'gqlcid',
+    gqlClipHash: 'gqlhash',
+} as unknown as TwitchConfig;
 
 function fakeFetch(opts: {gqlBody?: unknown; helixFirst401?: boolean} = {}) {
     const requests: {url: string; auth?: string; body?: string}[] = [];

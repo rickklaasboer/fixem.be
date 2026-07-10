@@ -1,7 +1,7 @@
 import {singleton} from 'tsyringe';
 import type {MiddlewareHandler} from 'hono';
 import type Middleware from '@/http/middleware/Middleware';
-import Config from '@/config/Config';
+import ApiConfig from '@/config/ApiConfig';
 import RateLimitStore from '@/services/rate-limit/RateLimitStore';
 import Clock from '@/services/Clock';
 import Secrets from '@/support/Secrets';
@@ -15,7 +15,7 @@ import Secrets from '@/support/Secrets';
 @singleton()
 export default class ApiRateLimitMiddleware implements Middleware {
     constructor(
-        private config: Config,
+        private config: ApiConfig,
         private store: RateLimitStore,
         private clock: Clock,
     ) {}
@@ -23,7 +23,7 @@ export default class ApiRateLimitMiddleware implements Middleware {
     public handle: MiddlewareHandler = async (c, next) => {
         const key = Secrets.bearer(c.req.header('Authorization'));
         const bucket = `api:${await Secrets.hash(key)}`;
-        const limit = this.config.apiRateLimitPerMin;
+        const limit = this.config.rateLimitPerMin;
         const hits = await this.store.hit(bucket, 60_000, this.clock.now());
         const remaining = Math.max(0, limit - hits);
         if (hits > limit) {

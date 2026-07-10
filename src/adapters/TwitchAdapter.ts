@@ -1,6 +1,6 @@
 import {injectable} from 'tsyringe';
 import BaseAdapter from '@/adapters/BaseAdapter';
-import Config from '@/config/Config';
+import TwitchConfig from '@/config/TwitchConfig';
 import HttpClient from '@/services/HttpClient';
 import type EmbedMetadata from '@/domain/EmbedMetadata';
 
@@ -48,7 +48,7 @@ export default class TwitchAdapter extends BaseAdapter {
     private token: {value: string; expiresAt: number} | null = null;
 
     constructor(
-        private config: Config,
+        private config: TwitchConfig,
         private http: HttpClient,
     ) {
         super();
@@ -109,8 +109,8 @@ export default class TwitchAdapter extends BaseAdapter {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
             body: new URLSearchParams({
-                client_id: this.config.twitchClientId ?? '',
-                client_secret: this.config.twitchClientSecret ?? '',
+                client_id: this.config.clientId ?? '',
+                client_secret: this.config.clientSecret ?? '',
                 grant_type: 'client_credentials',
             }).toString(),
             signal,
@@ -138,7 +138,7 @@ export default class TwitchAdapter extends BaseAdapter {
             {
                 headers: {
                     Authorization: `Bearer ${await this.appToken(signal)}`,
-                    'Client-Id': this.config.twitchClientId ?? '',
+                    'Client-Id': this.config.clientId ?? '',
                 },
                 signal,
             },
@@ -164,7 +164,7 @@ export default class TwitchAdapter extends BaseAdapter {
             const res = await this.http.fetch('https://gql.twitch.tv/gql', {
                 method: 'POST',
                 headers: {
-                    'Client-ID': this.config.twitchGqlClientId,
+                    'Client-ID': this.config.gqlClientId,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
@@ -173,7 +173,7 @@ export default class TwitchAdapter extends BaseAdapter {
                     extensions: {
                         persistedQuery: {
                             version: 1,
-                            sha256Hash: this.config.twitchGqlClipHash,
+                            sha256Hash: this.config.gqlClipHash,
                         },
                     },
                 }),

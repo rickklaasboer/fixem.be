@@ -1,6 +1,6 @@
 import {injectable} from 'tsyringe';
 import BaseAdapter from '@/adapters/BaseAdapter';
-import Config from '@/config/Config';
+import TiktokConfig from '@/config/TiktokConfig';
 import HttpClient, {CHROME_UA} from '@/services/HttpClient';
 import Text from '@/support/Text';
 import type EmbedMetadata from '@/domain/EmbedMetadata';
@@ -84,7 +84,7 @@ export default class TiktokAdapter extends BaseAdapter {
     public name = 'tiktok';
 
     constructor(
-        private config: Config,
+        private config: TiktokConfig,
         private http: HttpClient,
     ) {
         super();
@@ -221,7 +221,7 @@ export default class TiktokAdapter extends BaseAdapter {
         statusCode?: number;
         itemStruct?: ItemStruct;
     } {
-        const marker = `<script id="${this.config.tiktok.rehydrationScriptId}" type="application/json">`;
+        const marker = `<script id="${this.config.rehydrationScriptId}" type="application/json">`;
         const start = html.indexOf(marker);
         if (start < 0) throw new Error('tiktok: rehydration data not found');
         const from = start + marker.length;

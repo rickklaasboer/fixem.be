@@ -2,7 +2,7 @@ import {injectable} from 'tsyringe';
 import type {Context} from 'hono';
 import Resolver from '@/domain/Resolver';
 import OembedRenderer from '@/render/OembedRenderer';
-import Config from '@/config/Config';
+import AppConfig from '@/config/AppConfig';
 
 /**
  * Serves oEmbed JSON for a wrapped URL. Rate limiting is applied upstream by
@@ -13,7 +13,7 @@ export default class OembedController {
     constructor(
         private resolver: Resolver,
         private renderer: OembedRenderer,
-        private config: Config,
+        private config: AppConfig,
     ) {}
 
     /**

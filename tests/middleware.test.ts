@@ -1,6 +1,8 @@
 import {describe, expect, test} from 'bun:test';
 import {Hono} from 'hono';
-import type Config from '@/config/Config';
+import ApiConfig from '@/config/ApiConfig';
+import AppConfig from '@/config/AppConfig';
+import RateLimitConfig from '@/config/RateLimitConfig';
 import ApiAuthMiddleware from '@/http/middleware/ApiAuthMiddleware';
 import RateLimitMiddleware from '@/http/middleware/RateLimitMiddleware';
 import MemoryRateLimitStore from '@/services/rate-limit/MemoryRateLimitStore';
@@ -8,8 +10,8 @@ import type Clock from '@/services/Clock';
 import Crawler from '@/support/Crawler';
 
 describe('ApiAuthMiddleware', () => {
-    const build = (apiKeys: string[]) => {
-        const mw = new ApiAuthMiddleware({apiKeys} as unknown as Config);
+    const build = (keys: string[]) => {
+        const mw = new ApiAuthMiddleware({keys} as unknown as ApiConfig);
         const app = new Hono();
         app.use('/api/*', mw.handle);
         app.get('/api/thing', (c) => c.json({ok: true}));
@@ -59,13 +61,23 @@ describe('ApiAuthMiddleware', () => {
 
 describe('RateLimitMiddleware', () => {
     function buildApp(rateLimitPerMin: number) {
-        const config = {
-            rateLimitPerMin,
+        const appConfig = Object.assign(new AppConfig(), {
+            port: 3000,
+            publicBaseUrl: 'https://fixem.be',
             extraCrawlerUas: [],
-        } as unknown as Config;
+        });
+        const rateLimit = Object.assign(new RateLimitConfig(), {
+            perMin: rateLimitPerMin,
+        });
         const store = new MemoryRateLimitStore();
         const clock = {now: () => 1_000} as Clock;
-        const mw = new RateLimitMiddleware(config, store, clock, new Crawler());
+        const mw = new RateLimitMiddleware(
+            appConfig,
+            rateLimit,
+            store,
+            clock,
+            new Crawler(),
+        );
         const app = new Hono();
         app.use('*', mw.handle);
         app.get('/thing', (c) => c.text('ok'));

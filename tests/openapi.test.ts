@@ -8,6 +8,9 @@ const API_V1_PATHS = [
     '/api/v1/canonical',
     '/api/v1/platforms',
     '/api/v1/health',
+    '/api/v1/stats/usage',
+    '/api/v1/stats/keys',
+    '/api/v1/stats/bandwidth',
 ];
 
 describe('GET /openapi.yaml', () => {

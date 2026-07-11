@@ -5,6 +5,7 @@ import PublicMetaRenderer from '@/render/PublicMetaRenderer';
 import AdapterRegistry from '@/domain/AdapterRegistry';
 import Cache from '@/services/cache/Cache';
 import ApiConfig from '@/config/ApiConfig';
+import UsageTracker from '@/services/metrics/UsageTracker';
 import {PLATFORM_CAPABILITIES} from '@/domain/platformCapabilities';
 
 /**
@@ -20,6 +21,7 @@ export default class ApiV1Controller {
         private registry: AdapterRegistry,
         private cache: Cache,
         private config: ApiConfig,
+        private usage: UsageTracker,
     ) {}
 
     private static parseUrl(raw: string | undefined): URL | null {
@@ -37,6 +39,7 @@ export default class ApiV1Controller {
         if (!url) return c.json({error: 'missing or malformed url'}, 400);
         const proxied = c.req.query('media') === 'proxied';
         const outcome = await this.resolver.resolve(url);
+        this.usage.recordOutcome(outcome, 'api');
         return c.json(await this.publicMeta.toPublic(outcome, {proxied}));
     }
 
@@ -75,6 +78,7 @@ export default class ApiV1Controller {
                     return {url: raw, status: 'error', error: 'malformed url'};
                 }
                 const outcome = await this.resolver.resolve(url);
+                this.usage.recordOutcome(outcome, 'api');
                 return {
                     url: raw,
                     ...(await this.publicMeta.toPublic(outcome, {proxied})),

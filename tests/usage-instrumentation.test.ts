@@ -4,6 +4,7 @@ import Logger from '@/services/Logger';
 import Clock from '@/services/Clock';
 import MetricsStore from '@/services/metrics/MetricsStore';
 import UsageTracker from '@/services/metrics/UsageTracker';
+import Secrets from '@/support/Secrets';
 import createTestApp from './support/createTestApp';
 
 const silent = () => new Logger({write: () => {}});
@@ -87,5 +88,29 @@ describe('resolve/redirect instrumentation', () => {
                     r.outcome === 'ok',
             ),
         ).toBe(true);
+    });
+});
+
+describe('per-API-key instrumentation', () => {
+    test('a validated key records one hashed api-key row per request', async () => {
+        const {store, tracker, app} = harness2(['cust']);
+        await app.request('/api/v1/resolve?url=https://example.com/x', {
+            headers: {Authorization: 'Bearer cust'},
+        });
+        await app.request('/api/v1/canonical?url=https://example.com/x', {
+            headers: {Authorization: 'Bearer cust'},
+        });
+        tracker.flush();
+        const hashed = await Secrets.hash('cust');
+        expect(store.apiKeysBetween('2026-07-11', '2026-07-11')).toEqual([
+            {day: '2026-07-11', keyId: hashed, count: 2},
+        ]);
+    });
+
+    test('an unauthenticated request records no api-key row', async () => {
+        const {store, tracker, app} = harness2(['cust']);
+        await app.request('/api/v1/resolve?url=https://example.com/x'); // 401
+        tracker.flush();
+        expect(store.apiKeysBetween('2026-07-11', '2026-07-11')).toEqual([]);
     });
 });

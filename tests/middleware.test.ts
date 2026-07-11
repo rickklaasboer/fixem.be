@@ -8,10 +8,21 @@ import RateLimitMiddleware from '@/http/middleware/RateLimitMiddleware';
 import MemoryRateLimitStore from '@/services/rate-limit/MemoryRateLimitStore';
 import type Clock from '@/services/Clock';
 import Crawler from '@/support/Crawler';
+import Logger from '@/services/Logger';
+import MetricsStore from '@/services/metrics/MetricsStore';
+import UsageTracker from '@/services/metrics/UsageTracker';
 
 describe('ApiAuthMiddleware', () => {
     const build = (keys: string[]) => {
-        const mw = new ApiAuthMiddleware({keys} as unknown as ApiConfig);
+        const tracker = new UsageTracker(
+            new MetricsStore(null, new Logger({write: () => {}})),
+            {now: () => 0} as unknown as Clock,
+            new Logger({write: () => {}}),
+        );
+        const mw = new ApiAuthMiddleware(
+            {keys} as unknown as ApiConfig,
+            tracker,
+        );
         const app = new Hono();
         app.use('/api/*', mw.handle);
         app.get('/api/thing', (c) => c.json({ok: true}));

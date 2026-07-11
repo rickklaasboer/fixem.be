@@ -22,7 +22,12 @@ describe('MetricsStore', () => {
             ],
             apiKey: [{day: '2026-07-11', keyId: 'abc', count: 3}],
             proxyBytes: [
-                {day: '2026-07-11', platform: 'tiktok', bytes: 100, requests: 1},
+                {
+                    day: '2026-07-11',
+                    platform: 'tiktok',
+                    bytes: 100,
+                    requests: 1,
+                },
             ],
         });
         // Second flush of the SAME keys must add, not replace.

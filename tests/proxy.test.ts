@@ -17,7 +17,11 @@ const silent = new Logger({write: () => {}});
 const clock = {now: () => 1000} as Clock;
 const signer = new ProxySigner();
 // Proxy tests don't assert bandwidth — a null-db store makes recording a no-op.
-const usageStub = new UsageTracker(new MetricsStore(null, silent), clock, silent);
+const usageStub = new UsageTracker(
+    new MetricsStore(null, silent),
+    clock,
+    silent,
+);
 
 async function appWith(
     fetchFn: FetchFn,

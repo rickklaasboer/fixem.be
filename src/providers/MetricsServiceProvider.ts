@@ -47,7 +47,10 @@ export default class MetricsServiceProvider extends ServiceProvider {
         );
         this.app.registerInstance(UsageTracker, tracker);
 
-        const timer = setInterval(() => tracker.flush(), config.flushIntervalMs);
+        const timer = setInterval(
+            () => tracker.flush(),
+            config.flushIntervalMs,
+        );
         // Don't let the flush loop keep the process alive on shutdown.
         (timer as {unref?: () => void}).unref?.();
 

@@ -91,7 +91,7 @@ export default class EmbedController {
 
         const meta =
             outcome.status === 'ok'
-                ? await this.videoProxy.rewrite(outcome.meta)
+                ? await this.videoProxy.rewrite(outcome.meta, outcome.platform)
                 : this.renderer.minimalMeta(outcome.canonicalUrl);
         this.logger.info(
             {

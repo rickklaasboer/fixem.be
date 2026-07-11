@@ -4,6 +4,7 @@ export interface ProxyPayload {
     url: string;
     headers: Record<string, string>;
     exp: number; // epoch ms
+    platform?: string; // for proxy-bandwidth accounting; not security-relevant
 }
 
 /**

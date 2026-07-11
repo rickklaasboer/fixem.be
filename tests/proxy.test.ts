@@ -9,11 +9,15 @@ import ProxySigner from '@/services/proxy/ProxySigner';
 import MemoryRateLimitStore from '@/services/rate-limit/MemoryRateLimitStore';
 import VideoProxy from '@/services/proxy/VideoProxy';
 import ProxyStreamer from '@/services/proxy/ProxyStreamer';
+import MetricsStore from '@/services/metrics/MetricsStore';
+import UsageTracker from '@/services/metrics/UsageTracker';
 
 const SECRET = 's';
 const silent = new Logger({write: () => {}});
 const clock = {now: () => 1000} as Clock;
 const signer = new ProxySigner();
+// Proxy tests don't assert bandwidth — a null-db store makes recording a no-op.
+const usageStub = new UsageTracker(new MetricsStore(null, silent), clock, silent);
 
 async function appWith(
     fetchFn: FetchFn,
@@ -30,6 +34,7 @@ async function appWith(
         clock,
         new HttpClient(fetchFn),
         signer,
+        usageStub,
     );
     app.get('/v/:token', (c) => streamer.stream(c));
     return app;
@@ -136,6 +141,7 @@ describe('/v/ proxy', () => {
                 (async () => new Response('x')) as unknown as FetchFn,
             ),
             signer,
+            usageStub,
         );
         app.get('/v/:token', (c) => streamer.stream(c));
         const tok = await signer.sign('s', {

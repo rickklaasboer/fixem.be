@@ -49,6 +49,7 @@ export default class VideoProxy {
      */
     public async signedUrlFor(
         video: NonNullable<EmbedMetadata['video']>,
+        platform?: string,
     ): Promise<string | null> {
         if (!video.proxyHeaders) return null;
         if (!this.proxy.secret) return null;
@@ -68,6 +69,7 @@ export default class VideoProxy {
             url: video.url,
             headers: video.proxyHeaders,
             exp: this.clock.now() + PROXY_TOKEN_TTL_MS,
+            ...(platform ? {platform} : {}),
         });
         return `${this.app.publicBaseUrl}/v/${token}`;
     }
@@ -77,11 +79,14 @@ export default class VideoProxy {
      * carries `proxyHeaders`, degrading to a link (`dropVideo`) when
      * proxying is disabled or the host isn't https/allowlisted.
      */
-    public async rewrite(meta: EmbedMetadata): Promise<EmbedMetadata> {
+    public async rewrite(
+        meta: EmbedMetadata,
+        platform?: string,
+    ): Promise<EmbedMetadata> {
         if (!meta.video?.proxyHeaders) return meta;
         // Proxy required but disabled → drop rather than emit an unplayable CDN URL.
         if (!this.proxy.secret) return this.dropVideo(meta);
-        const signed = await this.signedUrlFor(meta.video);
+        const signed = await this.signedUrlFor(meta.video, platform);
         // proxySecret is set, so a null here means the /v/ route only fetches https
         // allowlisted hosts and this one isn't — a minted token would always 403. A
         // player that fails to load is worse than an honest thumbnail/link. Degrade +

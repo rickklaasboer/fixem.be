@@ -79,7 +79,10 @@ export default class PublicMetaRenderer {
                 needsProxy: Boolean(m.video.proxyHeaders),
             };
             if (opts.proxied) {
-                const signed = await this.videoProxy.signedUrlFor(m.video);
+                const signed = await this.videoProxy.signedUrlFor(
+                    m.video,
+                    outcome.platform,
+                );
                 if (signed) video.playableUrl = signed;
             }
             result.video = video;

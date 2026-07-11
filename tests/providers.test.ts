@@ -3,11 +3,15 @@ import {container} from '@/container';
 import CoreServiceProvider from '@/providers/CoreServiceProvider';
 import ApiServiceProvider from '@/providers/ApiServiceProvider';
 import ProxyServiceProvider from '@/providers/ProxyServiceProvider';
+import MetricsServiceProvider from '@/providers/MetricsServiceProvider';
 import Logger from '@/services/Logger';
 import HttpClient from '@/services/HttpClient';
 import AppConfig from '@/config/AppConfig';
 import ApiConfig from '@/config/ApiConfig';
 import ProxyConfig from '@/config/ProxyConfig';
+import UsageConfig from '@/config/UsageConfig';
+import MetricsStore from '@/services/metrics/MetricsStore';
+import UsageTracker from '@/services/metrics/UsageTracker';
 
 describe('service providers', () => {
     test('CoreServiceProvider registers leaves + app config', () => {
@@ -30,5 +34,16 @@ describe('service providers', () => {
         p.register();
         expect(c.resolve(ProxyConfig).secret).toBe('s');
         expect(() => p.boot()).not.toThrow();
+    });
+
+    test('MetricsServiceProvider registers store + tracker (in-memory db)', () => {
+        const c = container.createChildContainer();
+        new CoreServiceProvider(c, {}).register(); // Logger for the store
+        const p = new MetricsServiceProvider(c, {USAGE_DB_PATH: ':memory:'});
+        p.register();
+        expect(c.resolve(UsageConfig).dbPath).toBe(':memory:');
+        expect(() => p.boot()).not.toThrow();
+        expect(c.resolve(MetricsStore)).toBeInstanceOf(MetricsStore);
+        expect(c.resolve(UsageTracker)).toBeInstanceOf(UsageTracker);
     });
 });

@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import {Database} from 'bun:sqlite';
 import {Hono} from 'hono';
 import type {InjectionToken} from 'tsyringe';
 import {container} from '@/container';
@@ -30,6 +31,9 @@ import TwitterConfig from '@/config/TwitterConfig';
 import ThreadsConfig from '@/config/ThreadsConfig';
 import TiktokConfig from '@/config/TiktokConfig';
 import InstagramConfig from '@/config/InstagramConfig';
+import UsageConfig from '@/config/UsageConfig';
+import MetricsStore from '@/services/metrics/MetricsStore';
+import UsageTracker from '@/services/metrics/UsageTracker';
 import type PlatformAdapter from '@/domain/PlatformAdapter';
 
 // `Cache`/`RateLimitStore` are abstract classes used as injection tokens; the
@@ -51,6 +55,9 @@ export interface TestAppOverrides {
     threads?: Partial<ThreadsConfig>;
     tiktok?: Partial<TiktokConfig>;
     instagram?: Partial<InstagramConfig>;
+    usage?: Partial<UsageConfig>;
+    metricsStore?: MetricsStore;
+    usageTracker?: UsageTracker;
     /** Adapters for the registry (default: the example.com DummyAdapter). */
     adapters?: PlatformAdapter[];
     /** Replace the resolver wholesale (e.g. a throwing/degrading fake). */
@@ -126,6 +133,22 @@ export default function createTestApp(overrides: TestAppOverrides = {}): Hono {
     const clock = new Clock();
     if (overrides.now) clock.now = overrides.now;
     c.registerInstance(Clock, clock);
+
+    c.registerInstance(
+        UsageConfig,
+        slice(UsageConfig.fromEnv({}), overrides.usage),
+    );
+    const metricsStore =
+        overrides.metricsStore ??
+        new MetricsStore(
+            new Database(':memory:'),
+            new Logger({write: () => {}}),
+        );
+    c.registerInstance(MetricsStore, metricsStore);
+    const usageTracker =
+        overrides.usageTracker ??
+        new UsageTracker(metricsStore, clock, new Logger({write: () => {}}));
+    c.registerInstance(UsageTracker, usageTracker);
 
     const landingHtml =
         overrides.landingHtml ?? '<html>fixem.be landing</html>';

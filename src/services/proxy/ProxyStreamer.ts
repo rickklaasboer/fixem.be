@@ -8,6 +8,7 @@ import Clock from '@/services/Clock';
 import HttpClient from '@/services/HttpClient';
 import ProxySigner from '@/services/proxy/ProxySigner';
 import VideoProxy from '@/services/proxy/VideoProxy';
+import UsageTracker from '@/services/metrics/UsageTracker';
 
 const PASS_THROUGH = [
     'content-type',
@@ -57,11 +58,12 @@ function byteCeiling(
 // onEnd is idempotent.
 function streamProxyBody(
     source: ReadableStream<Uint8Array>,
-    onEnd: () => void,
+    onEnd: (bytes: number) => void,
     onStall: () => void,
     idleMs: number,
 ): ReadableStream<Uint8Array> {
     const reader = source.getReader();
+    let total = 0;
     return new ReadableStream<Uint8Array>({
         async pull(controller) {
             let timer: ReturnType<typeof setTimeout> | undefined;
@@ -79,21 +81,22 @@ function streamProxyBody(
                 });
                 const {done, value} = await Promise.race([read, idle]);
                 if (done) {
-                    onEnd();
+                    onEnd(total);
                     controller.close();
                     return;
                 }
+                total += value.byteLength;
                 controller.enqueue(value);
             } catch (err) {
                 onStall(); // abort the upstream fetch (no-op if it already ended)
-                onEnd();
+                onEnd(total);
                 controller.error(err);
             } finally {
                 if (timer) clearTimeout(timer);
             }
         },
         cancel(reason) {
-            onEnd();
+            onEnd(total);
             return reader.cancel(reason);
         },
     });
@@ -131,6 +134,7 @@ export default class ProxyStreamer {
         private clock: Clock,
         private http: HttpClient,
         private signer: ProxySigner,
+        private usage: UsageTracker,
     ) {}
 
     public async stream(c: Context): Promise<Response> {
@@ -157,6 +161,7 @@ export default class ProxyStreamer {
             this.clock.now(),
         );
         if (!payload) return c.text('not found', 404);
+        const platform = payload.platform ?? 'unknown';
 
         let target: URL;
         try {
@@ -252,9 +257,16 @@ export default class ProxyStreamer {
             // caps nothing (a valid token could then fan out unlimited concurrent
             // large-file streams). The finally must NOT also release it.
             streaming = true;
+            let ended = false;
+            const onEnd = (bytes: number) => {
+                if (ended) return;
+                ended = true;
+                release();
+                this.usage.recordProxyBytes(platform, bytes);
+            };
             const body = streamProxyBody(
                 up.body.pipeThrough(byteCeiling(this.proxy.maxBytes)),
-                release,
+                onEnd,
                 () => abort.abort(),
                 this.proxy.timeoutMs,
             );

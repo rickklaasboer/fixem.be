@@ -108,6 +108,100 @@ paths:
             application/json: {schema: {type: object}}
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
+  /api/v1/stats/usage:
+    get:
+      summary: Daily usage rollups (admin)
+      description: Aggregate daily request counts by platform, outcome, cache, and UA class. Admin-only (ADMIN_API_KEYS); the whole subtree 404s when unconfigured.
+      security:
+        - adminAuth: []
+      parameters:
+        - {name: from, in: query, required: false, schema: {type: string, format: date}, description: 'Inclusive start day (YYYY-MM-DD, UTC). Default 30 days ago.'}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}, description: 'Inclusive end day (YYYY-MM-DD, UTC). Default today.'}
+      responses:
+        '200':
+          description: Usage rows for the range.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from: {type: string, format: date}
+                  to: {type: string, format: date}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        day: {type: string, format: date}
+                        platform: {type: string}
+                        outcome: {type: string, enum: [ok, degraded, no-adapter, redirect]}
+                        cache: {type: string, enum: [hit, miss, 'n/a']}
+                        uaClass: {type: string, enum: [crawler, browser, preview, api]}
+                        count: {type: integer}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {description: 'Admin stats disabled (no ADMIN_API_KEYS configured).'}
+  /api/v1/stats/keys:
+    get:
+      summary: Daily per-API-key request counts (admin)
+      description: Aggregate daily request counts per hashed API key (never the raw key). Admin-only.
+      security:
+        - adminAuth: []
+      parameters:
+        - {name: from, in: query, required: false, schema: {type: string, format: date}, description: 'Inclusive start day (YYYY-MM-DD, UTC). Default 30 days ago.'}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}, description: 'Inclusive end day (YYYY-MM-DD, UTC). Default today.'}
+      responses:
+        '200':
+          description: Per-key rows for the range.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from: {type: string, format: date}
+                  to: {type: string, format: date}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        day: {type: string, format: date}
+                        keyId: {type: string, description: SHA-256 hash of the key, never the raw key.}
+                        count: {type: integer}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {description: 'Admin stats disabled.'}
+  /api/v1/stats/bandwidth:
+    get:
+      summary: Daily proxy bandwidth per platform (admin)
+      description: Aggregate daily bytes and request counts streamed through /v/, per platform. Admin-only.
+      security:
+        - adminAuth: []
+      parameters:
+        - {name: from, in: query, required: false, schema: {type: string, format: date}, description: 'Inclusive start day (YYYY-MM-DD, UTC). Default 30 days ago.'}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}, description: 'Inclusive end day (YYYY-MM-DD, UTC). Default today.'}
+      responses:
+        '200':
+          description: Bandwidth rows for the range.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from: {type: string, format: date}
+                  to: {type: string, format: date}
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        day: {type: string, format: date}
+                        platform: {type: string}
+                        bytes: {type: integer}
+                        requests: {type: integer}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {description: 'Admin stats disabled.'}
   /oembed:
     get:
       summary: oEmbed JSON (public, unauthenticated)
@@ -128,6 +222,10 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
+    adminAuth:
+      type: http
+      scheme: bearer
+      description: Admin bearer token (ADMIN_API_KEYS) for /api/v1/stats/*. Distinct from the customer API_KEYS used by bearerAuth.
   responses:
     BadRequest:
       description: Malformed or oversized request.

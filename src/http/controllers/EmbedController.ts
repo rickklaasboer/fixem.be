@@ -7,6 +7,7 @@ import Crawler from '@/support/Crawler';
 import AppConfig from '@/config/AppConfig';
 import Logger from '@/services/Logger';
 import TargetUrl from '@/support/TargetUrl';
+import UsageTracker from '@/services/metrics/UsageTracker';
 
 const USAGE_HINT =
     'fixem.be — prepend https://fixem.be/ to a social media URL, e.g. https://fixem.be/https://www.reddit.com/r/pics/comments/abc';
@@ -25,6 +26,7 @@ export default class EmbedController {
         private crawler: Crawler,
         private app: AppConfig,
         private logger: Logger,
+        private usage: UsageTracker,
     ) {}
 
     private oembedUrlFor(canonicalUrl: string): string {
@@ -63,11 +65,23 @@ export default class EmbedController {
                 },
                 'redirected',
             );
+            this.usage.recordResolve({
+                platform: canonical?.platform ?? 'none',
+                outcome: 'redirect',
+                cache: 'n/a',
+                uaClass: 'browser',
+            });
             return c.redirect(canonical?.canonicalUrl ?? parsed.url.href, 302);
         }
 
         const outcome = await this.resolver.resolve(parsed.url);
         if (outcome.status === 'no-adapter') {
+            this.usage.recordResolve({
+                platform: 'none',
+                outcome: 'no-adapter',
+                cache: 'n/a',
+                uaClass: crawler ? 'crawler' : 'preview',
+            });
             // Crawlers get a bare redirect (no embed to build). Under /preview/,
             // that redirect is invisible/confusing when debugging, so show why instead.
             if (preview)
@@ -77,7 +91,7 @@ export default class EmbedController {
 
         const meta =
             outcome.status === 'ok'
-                ? await this.videoProxy.rewrite(outcome.meta)
+                ? await this.videoProxy.rewrite(outcome.meta, outcome.platform)
                 : this.renderer.minimalMeta(outcome.canonicalUrl);
         this.logger.info(
             {
@@ -93,6 +107,7 @@ export default class EmbedController {
             },
             'embed served',
         );
+        this.usage.recordOutcome(outcome, crawler ? 'crawler' : 'preview');
         // Preview is a human-facing debug view: render the full diagnostic report
         // (outcome, visual card, parsed metadata, exact crawler HTML) and never cache
         // it. Crawlers get the plain meta HTML.

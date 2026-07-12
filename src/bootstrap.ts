@@ -3,6 +3,7 @@ import type {DependencyContainer} from 'tsyringe';
 import {container} from '@/container';
 import routes from '@/http/routes';
 import CoreServiceProvider from '@/providers/CoreServiceProvider';
+import MetricsServiceProvider from '@/providers/MetricsServiceProvider';
 import CacheServiceProvider from '@/providers/CacheServiceProvider';
 import RateLimitServiceProvider from '@/providers/RateLimitServiceProvider';
 import ApiServiceProvider from '@/providers/ApiServiceProvider';
@@ -15,6 +16,7 @@ import type {Env} from '@/config/env';
 // AdapterServiceProvider eagerly resolves adapters that inject them.
 const PROVIDERS = [
     CoreServiceProvider,
+    MetricsServiceProvider,
     CacheServiceProvider,
     RateLimitServiceProvider,
     ApiServiceProvider,
